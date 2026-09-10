@@ -12,11 +12,19 @@ class Aegis_Day0_Scanner {
     private $token_analyzer;
     
     /**
-     * Constructor - inicializa el analizador de tokens
+     * Instancia del analizador AST
+     */
+    private $ast_analyzer;
+    
+    /**
+     * Constructor - inicializa los analizadores
      */
     public function __construct() {
         if (class_exists('Aegis_Token_Analyzer')) {
             $this->token_analyzer = new Aegis_Token_Analyzer();
+        }
+        if (class_exists('Aegis_AST_Analyzer')) {
+            $this->ast_analyzer = new Aegis_AST_Analyzer();
         }
     }
 
@@ -121,6 +129,48 @@ class Aegis_Day0_Scanner {
                 }
             }
 
+            // AST-based analysis (análisis más preciso con PHP-Parser)
+            if ($this->ast_analyzer) {
+                $ast_issues = $this->ast_based_scan($plugin_file);
+                foreach ($ast_issues as $issue) {
+                    $alert_key = md5($plugin_name . '|' . $issue['type'] . '|' . $issue['function'] . '|' . $issue['line'] . '|AST');
+
+                    if (!isset($processed_alerts[$alert_key])) {
+                        $processed_alerts[$alert_key] = true;
+
+                        $alerts[] = [
+                            'plugin'   => $plugin_name,
+                            'type'     => sanitize_text_field($issue['type']),
+                            'severity' => sanitize_text_field($issue['severity']),
+                            'source'   => 'AST Analysis',
+                            'false_positive_risk' => isset($issue['false_positive_risk']) ? $issue['false_positive_risk'] : 'unknown',
+                            'function' => isset($issue['function']) ? $issue['function'] : '',
+                            'line' => isset($issue['line']) ? $issue['line'] : 0
+                        ];
+
+                        Aegis_Day0_Logger::add_log(
+                            $plugin_name,
+                            $issue['type'],
+                            $issue['severity'],
+                            'AST Analysis',
+                            sprintf('Línea %d: %s - %s', $issue['line'], $issue['function'], $issue['description'])
+                        );
+
+                        // Only send notification for non-low severity issues
+                        if ($issue['severity'] !== 'Low') {
+                            Aegis_Day0_Notify::alert_admin($plugin_name, $issue['type'], $issue['severity']);
+                        }
+
+                        // Auto-disable solo para críticos con bajo riesgo de falso positivo
+                        if ($issue['severity'] === 'Critical' &&
+                            isset($issue['false_positive_risk']) &&
+                            $issue['false_positive_risk'] === 'low') {
+                            $this->maybe_disable_plugin($plugin_file, $issue['severity']);
+                        }
+                    }
+                }
+            }
+
             // WPScan query
             $wpscan_issues = Aegis_Day0_WPScan::check_plugin($plugin_name);
             foreach ($wpscan_issues as $issue) {
@@ -194,6 +244,49 @@ class Aegis_Day0_Scanner {
             ];
         }
         
+        return $issues;
+    }
+
+    /**
+     * Escaneo basado en análisis AST con PHP-Parser
+     *
+     * @param string $plugin_file Archivo del plugin
+     * @return array Issues encontrados
+     */
+    private function ast_based_scan($plugin_file) {
+        $issues = [];
+
+        if (!$this->ast_analyzer) {
+            return $issues;
+        }
+
+        $plugin_path = WP_PLUGIN_DIR . '/' . $plugin_file;
+
+        // Validate file path to prevent directory traversal
+        $real_path = realpath($plugin_path);
+        if (!$real_path || strpos($real_path, WP_PLUGIN_DIR) !== 0) {
+            return $issues;
+        }
+
+        if (!file_exists($real_path) || !is_readable($real_path)) {
+            return $issues;
+        }
+
+        // Usar el analizador AST
+        $alerts = $this->ast_analyzer->analyze_file($real_path);
+
+        foreach ($alerts as $alert) {
+            $issues[] = [
+                'type' => isset($alert['description']) ? $alert['description'] : 'Patrón peligroso detectado vía AST',
+                'severity' => isset($alert['severity']) ? ucfirst($alert['severity']) : 'Medium',
+                'false_positive_risk' => isset($alert['false_positive_risk']) ? $alert['false_positive_risk'] : 'medium',
+                'function' => isset($alert['function']) ? $alert['function'] : '',
+                'line' => isset($alert['line']) ? $alert['line'] : 0,
+                'description' => isset($alert['description']) ? $alert['description'] : '',
+                'recommendation' => isset($alert['recommendation']) ? $alert['recommendation'] : ''
+            ];
+        }
+
         return $issues;
     }
 
