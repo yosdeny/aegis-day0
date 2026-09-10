@@ -1,0 +1,44 @@
+```
+# Compiled and binary files
+*.pyc
+__pycache__/
+*.o
+*.obj
+*.so
+*.dll
+*.exe
+
+# Dependencies
+vendor/
+node_modules/
+composer.lock
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+
+# Environment
+.env
+.env.local
+*.env.*
+
+# Editors
+.vscode/
+.idea/
+*.swo
+
+# Build artifacts
+dist/
+build/
+target/
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# OS specific
+.DS_Store
+Thumbs.db
+```
