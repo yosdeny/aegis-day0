@@ -1,1 +1,1 @@
-Nothing should be ignored since the changes only include source/config files (.php, .txt) without any build artifacts, dependencies, or temporary files.
+(readme.txt is a source/config file, no build artifacts, dependencies, or temp files in the changes)
