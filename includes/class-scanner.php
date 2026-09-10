@@ -2,13 +2,21 @@
 class Aegis_Day0_Scanner {
 
     public function run_checks() {
-        // Only run for users with appropriate capabilities
+        // Only run for users with appropriate capabilities or in CLI/CRON context
         if (!current_user_can('manage_options') && !defined('WP_CLI') && !defined('DOING_CRON')) {
             return;
         }
         
+        // Prevent running on every admin page load - use caching
+        $last_scan = get_transient('aegis_day0_last_scan');
+        if ($last_scan && !defined('WP_CLI') && !defined('DOING_CRON')) {
+            return; // Skip if scanned within last hour
+        }
+        set_transient('aegis_day0_last_scan', time(), HOUR_IN_SECONDS);
+        
         $plugins = get_plugins();
         $alerts = [];
+        $processed_alerts = []; // Track unique alerts to prevent duplicates
 
         foreach ($plugins as $plugin_file => $plugin_data) {
             $plugin_name = sanitize_text_field($plugin_data['Name']);
@@ -16,29 +24,69 @@ class Aegis_Day0_Scanner {
             // Static scan
             $issues = $this->static_scan($plugin_file);
             foreach ($issues as $issue) {
-                $alerts[] = [
-                    'plugin'   => $plugin_name,
-                    'type'     => sanitize_text_field($issue['type']),
-                    'severity' => sanitize_text_field($issue['severity']),
-                    'source'   => 'Static Scan'
-                ];
-                Aegis_Day0_Logger::add_log($plugin_name, $issue['type'], $issue['severity'], 'Static Scan', 'Detectado');
-                Aegis_Day0_Notify::alert_admin($plugin_name, $issue['type'], $issue['severity']);
-                $this->maybe_disable_plugin($plugin_file, $issue['severity']);
+                // Create unique key to prevent duplicate alerts
+                $alert_key = md5($plugin_name . '|' . $issue['type'] . '|' . $issue['severity']);
+                
+                if (!isset($processed_alerts[$alert_key])) {
+                    $processed_alerts[$alert_key] = true;
+                    
+                    $alerts[] = [
+                        'plugin'   => $plugin_name,
+                        'type'     => sanitize_text_field($issue['type']),
+                        'severity' => sanitize_text_field($issue['severity']),
+                        'source'   => 'Static Scan',
+                        'false_positive_risk' => isset($issue['false_positive_risk']) ? $issue['false_positive_risk'] : 'unknown'
+                    ];
+                    
+                    Aegis_Day0_Logger::add_log(
+                        $plugin_name, 
+                        $issue['type'], 
+                        $issue['severity'], 
+                        'Static Scan', 
+                        'Detectado'
+                    );
+                    
+                    // Only send notification for non-low severity issues
+                    if ($issue['severity'] !== 'Low') {
+                        Aegis_Day0_Notify::alert_admin($plugin_name, $issue['type'], $issue['severity']);
+                    }
+                    
+                    // Only auto-disable for Critical severity with low false positive risk
+                    if ($issue['severity'] === 'Critical' && 
+                        isset($issue['false_positive_risk']) && 
+                        $issue['false_positive_risk'] === 'low') {
+                        $this->maybe_disable_plugin($plugin_file, $issue['severity']);
+                    }
+                }
             }
 
             // WPScan query
             $wpscan_issues = Aegis_Day0_WPScan::check_plugin($plugin_name);
             foreach ($wpscan_issues as $issue) {
-                $alerts[] = [
-                    'plugin'   => $plugin_name,
-                    'type'     => $issue['type'], // Already sanitized in WPScan class
-                    'severity' => $issue['severity'], // Already sanitized in WPScan class
-                    'source'   => 'WPScan'
-                ];
-                Aegis_Day0_Logger::add_log($plugin_name, $issue['type'], $issue['severity'], 'WPScan', 'Detectado');
-                Aegis_Day0_Notify::alert_admin($plugin_name, $issue['type'], $issue['severity']);
-                $this->maybe_disable_plugin($plugin_file, $issue['severity']);
+                // Create unique key to prevent duplicate alerts
+                $alert_key = md5($plugin_name . '|' . $issue['type'] . '|' . $issue['severity']);
+                
+                if (!isset($processed_alerts[$alert_key])) {
+                    $processed_alerts[$alert_key] = true;
+                    
+                    $alerts[] = [
+                        'plugin'   => $plugin_name,
+                        'type'     => sanitize_text_field($issue['type']),
+                        'severity' => sanitize_text_field($issue['severity']),
+                        'source'   => 'WPScan'
+                    ];
+                    
+                    Aegis_Day0_Logger::add_log(
+                        $plugin_name, 
+                        $issue['type'], 
+                        $issue['severity'], 
+                        'WPScan', 
+                        'Detectado'
+                    );
+                    
+                    Aegis_Day0_Notify::alert_admin($plugin_name, $issue['type'], $issue['severity']);
+                    $this->maybe_disable_plugin($plugin_file, $issue['severity']);
+                }
             }
         }
 
@@ -65,10 +113,18 @@ class Aegis_Day0_Scanner {
         }
 
         foreach (Aegis_Day0_Rules::get_rules() as $rule) {
-            if (@preg_match($rule['pattern'], $content)) {
+            if (@preg_match($rule['pattern'], $content, $matches, PREG_OFFSET_CAPTURE)) {
+                // Apply contextual filtering to reduce false positives
+                if (method_exists('Aegis_Day0_Rules', 'should_report')) {
+                    if (!Aegis_Day0_Rules::should_report($rule, $content, $matches[0][1])) {
+                        continue;
+                    }
+                }
+                
                 $issues[] = [
                     'type'     => $rule['description'],
-                    'severity' => $rule['severity']
+                    'severity' => $rule['severity'],
+                    'false_positive_risk' => isset($rule['false_positive_risk']) ? $rule['false_positive_risk'] : 'unknown'
                 ];
             }
         }
@@ -78,22 +134,59 @@ class Aegis_Day0_Scanner {
 
     private function maybe_disable_plugin($plugin_file, $severity) {
         $auto_disable = get_option('aegis_day0_auto_disable', 0);
+        
+        // Only auto-disable for Critical severity issues
         if ($auto_disable && $severity === 'Critical') {
             // Prevent disabling critical WordPress plugins
-            $critical_plugins = ['wordpress-seo/wp-seo.php', 'woocommerce/woocommerce.php'];
+            $critical_plugins = [
+                'wordpress-seo/wp-seo.php', 
+                'woocommerce/woocommerce.php',
+                'akismet/akismet.php',
+                'classic-editor/classic-editor.php'
+            ];
+            
             if (in_array($plugin_file, $critical_plugins, true)) {
                 Aegis_Day0_Logger::add_log(
                     $plugin_file, 
                     'Auto-disable skipped', 
                     'Critical', 
                     'System', 
-                    'Plugin crítico - no desactivar automáticamente'
+                    'Plugin crítico del sistema - no desactivar automáticamente'
                 );
                 return;
             }
             
+            // Get plugin info for logging
+            $plugins = get_plugins();
+            $plugin_name = isset($plugins[$plugin_file]) ? $plugins[$plugin_file]['Name'] : $plugin_file;
+            
+            // Log the action before disabling
+            Aegis_Day0_Logger::add_log(
+                $plugin_name, 
+                'Auto-disable triggered', 
+                'Critical', 
+                'System', 
+                'Plugin desactivado por vulnerabilidad crítica detectada'
+            );
+            
+            // Deactivate the plugin
             deactivate_plugins($plugin_file);
-            Aegis_Day0_Logger::add_log($plugin_file, 'Auto-disable', 'Critical', 'System', 'Plugin desactivado');
+            
+            // Send immediate notification about the auto-disable action
+            $admin_email = get_option('admin_email');
+            if (is_email($admin_email)) {
+                $subject = __('🚨 Aegis Day0 - Plugin desactivado automáticamente', 'aegis-day0');
+                $message = sprintf(
+                    __("El plugin '%s' ha sido desactivado automáticamente debido a una vulnerabilidad crítica detectada.\n\nPor favor, revise el dashboard de Aegis Day0 para más detalles.", 'aegis-day0'),
+                    $plugin_name
+                );
+                wp_mail(
+                    sanitize_email($admin_email), 
+                    $subject, 
+                    $message, 
+                    ['Content-Type: text/plain; charset=UTF-8']
+                );
+            }
         }
     }
 }
