@@ -2,20 +2,26 @@
 /**
  * Plugin Name: Aegis Day0
  * Description: Detección proactiva de vulnerabilidades día 0 en plugins de WordPress.
- * Version: 0.1
+ * Version: 0.2
  * Author: Yosdeny
+ * Text Domain: aegis-day0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
+// Constants
+define('AEGIS_DAY0_VERSION', '0.2');
+define('AEGIS_DAY0_PLUGIN_DIR', plugin_dir_path(__FILE__));
+define('AEGIS_DAY0_PLUGIN_URL', plugin_dir_url(__FILE__));
+
 // Includes
-require_once plugin_dir_path(__FILE__) . 'includes/class-scanner.php';
-require_once plugin_dir_path(__FILE__) . 'includes/rules.php';
-require_once plugin_dir_path(__FILE__) . 'includes/api-wpscan.php';
-require_once plugin_dir_path(__FILE__) . 'includes/notify.php';
-require_once plugin_dir_path(__FILE__) . 'includes/logger.php';
-require_once plugin_dir_path(__FILE__) . 'includes/reports.php';
-require_once plugin_dir_path(__FILE__) . 'admin/dashboard.php';
+require_once AEGIS_DAY0_PLUGIN_DIR . 'includes/class-scanner.php';
+require_once AEGIS_DAY0_PLUGIN_DIR . 'includes/rules.php';
+require_once AEGIS_DAY0_PLUGIN_DIR . 'includes/api-wpscan.php';
+require_once AEGIS_DAY0_PLUGIN_DIR . 'includes/notify.php';
+require_once AEGIS_DAY0_PLUGIN_DIR . 'includes/logger.php';
+require_once AEGIS_DAY0_PLUGIN_DIR . 'includes/reports.php';
+require_once AEGIS_DAY0_PLUGIN_DIR . 'admin/dashboard.php';
 
 // Inicialización
 function aegis_day0_init() {
@@ -26,21 +32,46 @@ add_action('admin_init', 'aegis_day0_init');
 
 // Settings
 function aegis_day0_register_settings() {
-    register_setting('aegis_day0_settings', 'aegis_day0_auto_disable');
-    register_setting('aegis_day0_settings', 'aegis_day0_report_frequency');
-    register_setting('aegis_day0_settings', 'aegis_day0_report_time');
-    register_setting('aegis_day0_settings', 'aegis_day0_report_recipients');
+    register_setting('aegis_day0_settings', 'aegis_day0_auto_disable', [
+        'type' => 'integer',
+        'sanitize_callback' => 'absint',
+        'default' => 0
+    ]);
+    register_setting('aegis_day0_settings', 'aegis_day0_report_frequency', [
+        'type' => 'string',
+        'sanitize_callback' => 'sanitize_text_field',
+        'default' => 'weekly'
+    ]);
+    register_setting('aegis_day0_settings', 'aegis_day0_report_time', [
+        'type' => 'string',
+        'sanitize_callback' => 'sanitize_text_field',
+        'default' => '08:00'
+    ]);
+    register_setting('aegis_day0_settings', 'aegis_day0_report_recipients', [
+        'type' => 'string',
+        'sanitize_callback' => 'sanitize_text_field',
+        'default' => ''
+    ]);
+    register_setting('aegis_day0_settings', 'aegis_day0_wpscan_token', [
+        'type' => 'string',
+        'sanitize_callback' => 'sanitize_text_field',
+        'default' => ''
+    ]);
 }
 add_action('admin_init', 'aegis_day0_register_settings');
 
 // Cron programado
 function aegis_day0_schedule_reports() {
+    if (!current_user_can('manage_options')) {
+        return;
+    }
+    
     wp_clear_scheduled_hook('aegis_day0_send_report');
 
     $frequency = get_option('aegis_day0_report_frequency', 'weekly');
     $time = get_option('aegis_day0_report_time', '08:00');
     list($hour, $minute) = explode(':', $time);
-    $timestamp = mktime($hour, $minute, 0);
+    $timestamp = mktime((int)$hour, (int)$minute, 0);
 
     if ($frequency === 'daily') {
         wp_schedule_event($timestamp, 'daily', 'aegis_day0_send_report');
@@ -54,3 +85,33 @@ add_action('update_option_aegis_day0_report_frequency', 'aegis_day0_schedule_rep
 add_action('update_option_aegis_day0_report_time', 'aegis_day0_schedule_reports', 10, 2);
 
 add_action('aegis_day0_send_report', ['Aegis_Day0_Reports', 'send_report']);
+
+// Activation hook
+function aegis_day0_activate() {
+    if (!current_user_can('activate_plugins')) {
+        return;
+    }
+    
+    // Set default options
+    add_option('aegis_day0_auto_disable', 0);
+    add_option('aegis_day0_report_frequency', 'weekly');
+    add_option('aegis_day0_report_time', '08:00');
+    add_option('aegis_day0_report_recipients', '');
+    add_option('aegis_day0_wpscan_token', '');
+    add_option('aegis_day0_alerts', []);
+    add_option('aegis_day0_logs', []);
+    
+    // Schedule initial report
+    aegis_day0_schedule_reports();
+}
+register_activation_hook(__FILE__, 'aegis_day0_activate');
+
+// Deactivation hook
+function aegis_day0_deactivate() {
+    if (!current_user_can('activate_plugins')) {
+        return;
+    }
+    
+    wp_clear_scheduled_hook('aegis_day0_send_report');
+}
+register_deactivation_hook(__FILE__, 'aegis_day0_deactivate');
