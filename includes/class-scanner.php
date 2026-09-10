@@ -1,5 +1,24 @@
 <?php
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 class Aegis_Day0_Scanner {
+    
+    /**
+     * Instancia del analizador de tokens
+     */
+    private $token_analyzer;
+    
+    /**
+     * Constructor - inicializa el analizador de tokens
+     */
+    public function __construct() {
+        if (class_exists('Aegis_Token_Analyzer')) {
+            $this->token_analyzer = new Aegis_Token_Analyzer();
+        }
+    }
 
     public function run_checks() {
         // Only run for users with appropriate capabilities or in CLI/CRON context
@@ -21,7 +40,7 @@ class Aegis_Day0_Scanner {
         foreach ($plugins as $plugin_file => $plugin_data) {
             $plugin_name = sanitize_text_field($plugin_data['Name']);
 
-            // Static scan
+            // Static scan con reglas regex (método tradicional)
             $issues = $this->static_scan($plugin_file);
             foreach ($issues as $issue) {
                 // Create unique key to prevent duplicate alerts
@@ -59,6 +78,48 @@ class Aegis_Day0_Scanner {
                     }
                 }
             }
+            
+            // Token-based analysis (nuevo método avanzado)
+            if ($this->token_analyzer) {
+                $token_issues = $this->token_based_scan($plugin_file);
+                foreach ($token_issues as $issue) {
+                    $alert_key = md5($plugin_name . '|' . $issue['type'] . '|' . $issue['function'] . '|' . $issue['line']);
+                    
+                    if (!isset($processed_alerts[$alert_key])) {
+                        $processed_alerts[$alert_key] = true;
+                        
+                        $alerts[] = [
+                            'plugin'   => $plugin_name,
+                            'type'     => sanitize_text_field($issue['type']),
+                            'severity' => sanitize_text_field($issue['severity']),
+                            'source'   => 'Token Analysis',
+                            'false_positive_risk' => isset($issue['false_positive_risk']) ? $issue['false_positive_risk'] : 'unknown',
+                            'function' => isset($issue['function']) ? $issue['function'] : '',
+                            'line' => isset($issue['line']) ? $issue['line'] : 0
+                        ];
+                        
+                        Aegis_Day0_Logger::add_log(
+                            $plugin_name, 
+                            $issue['type'], 
+                            $issue['severity'], 
+                            'Token Analysis', 
+                            sprintf('Línea %d: %s', $issue['line'], $issue['function'])
+                        );
+                        
+                        // Only send notification for non-low severity issues
+                        if ($issue['severity'] !== 'Low') {
+                            Aegis_Day0_Notify::alert_admin($plugin_name, $issue['type'], $issue['severity']);
+                        }
+                        
+                        // Auto-disable solo para críticos con bajo riesgo de falso positivo
+                        if ($issue['severity'] === 'Critical' && 
+                            isset($issue['false_positive_risk']) && 
+                            $issue['false_positive_risk'] === 'low') {
+                            $this->maybe_disable_plugin($plugin_file, $issue['severity']);
+                        }
+                    }
+                }
+            }
 
             // WPScan query
             $wpscan_issues = Aegis_Day0_WPScan::check_plugin($plugin_name);
@@ -91,6 +152,49 @@ class Aegis_Day0_Scanner {
         }
 
         update_option('aegis_day0_alerts', $alerts);
+    }
+
+    /**
+     * Escaneo basado en análisis de tokens PHP
+     * 
+     * @param string $plugin_file Archivo del plugin
+     * @return array Issues encontrados
+     */
+    private function token_based_scan($plugin_file) {
+        $issues = [];
+        
+        if (!$this->token_analyzer) {
+            return $issues;
+        }
+        
+        $plugin_path = WP_PLUGIN_DIR . '/' . $plugin_file;
+        
+        // Validate file path to prevent directory traversal
+        $real_path = realpath($plugin_path);
+        if (!$real_path || strpos($real_path, WP_PLUGIN_DIR) !== 0) {
+            return $issues;
+        }
+        
+        if (!file_exists($real_path) || !is_readable($real_path)) {
+            return $issues;
+        }
+        
+        // Usar el analizador de tokens
+        $alerts = $this->token_analyzer->analyze_file($real_path);
+        
+        foreach ($alerts as $alert) {
+            $issues[] = [
+                'type' => isset($alert['description']) ? $alert['description'] : 'Función peligrosa detectada',
+                'severity' => isset($alert['severity']) ? ucfirst($alert['severity']) : 'Medium',
+                'false_positive_risk' => isset($alert['false_positive_risk']) ? $alert['false_positive_risk'] : 'medium',
+                'function' => isset($alert['function']) ? $alert['function'] : '',
+                'line' => isset($alert['line']) ? $alert['line'] : 0,
+                'context' => isset($alert['context']) ? $alert['context'] : '',
+                'recommendation' => isset($alert['recommendation']) ? $alert['recommendation'] : ''
+            ];
+        }
+        
+        return $issues;
     }
 
     private function static_scan($plugin_file) {

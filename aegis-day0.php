@@ -23,6 +23,7 @@ define('AEGIS_DAY0_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('AEGIS_DAY0_PLUGIN_URL', plugin_dir_url(__FILE__));
 
 // Includes
+require_once AEGIS_DAY0_PLUGIN_DIR . 'includes/class-token-analyzer.php';
 require_once AEGIS_DAY0_PLUGIN_DIR . 'includes/class-scanner.php';
 require_once AEGIS_DAY0_PLUGIN_DIR . 'includes/rules.php';
 require_once AEGIS_DAY0_PLUGIN_DIR . 'includes/api-wpscan.php';
