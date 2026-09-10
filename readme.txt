@@ -2,6 +2,14 @@
 🛡️ Aegis Day0 - Plugin de Seguridad
 ========================================
 
+Stable tag: 0.2
+Requires at least: 7.0
+Tested up to: 7.1
+Requires PHP: 8.0
+Tested PHP: 8.2
+License: GPLv2 or later
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
+
 Descripción:
 ------------
 Aegis Day0 es un plugin de seguridad para WordPress diseñado para detectar 
@@ -48,8 +56,4 @@ Buenas prácticas:
 
 Autor:
 ------
-Yosdeny
-
-Versión:
---------
-0.1
+YGB
