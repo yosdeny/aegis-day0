@@ -49,6 +49,7 @@ function aegis_day0_dashboard() {
                     <th><?php echo esc_html__('Tipo', 'aegis-day0'); ?></th>
                     <th><?php echo esc_html__('Severidad', 'aegis-day0'); ?></th>
                     <th><?php echo esc_html__('Fuente', 'aegis-day0'); ?></th>
+                    <th><?php echo esc_html__('Riesgo Falso Positivo', 'aegis-day0'); ?></th>
                 </tr>
             </thead>
             <tbody>
@@ -56,25 +57,44 @@ function aegis_day0_dashboard() {
                 $alerts = get_option('aegis_day0_alerts', []);
                 if (!empty($alerts)) {
                     foreach ($alerts as $alert) {
+                        $fp_risk = isset($alert['false_positive_risk']) ? $alert['false_positive_risk'] : 'unknown';
+                        $fp_indicator = '';
+                        if ($fp_risk === 'high') {
+                            $fp_indicator = '⚠️ ' . esc_html__('Alto', 'aegis-day0');
+                        } elseif ($fp_risk === 'medium') {
+                            $fp_indicator = '◐ ' . esc_html__('Medio', 'aegis-day0');
+                        } elseif ($fp_risk === 'low') {
+                            $fp_indicator = '✓ ' . esc_html__('Bajo', 'aegis-day0');
+                        } else {
+                            $fp_indicator = '? ' . esc_html__('Desconocido', 'aegis-day0');
+                        }
                         ?>
                         <tr>
                             <td><?php echo esc_html($alert['plugin']); ?></td>
                             <td><?php echo esc_html($alert['type']); ?></td>
                             <td><?php echo esc_html($alert['severity']); ?></td>
                             <td><?php echo esc_html($alert['source']); ?></td>
+                            <td><?php echo $fp_indicator; ?></td>
                         </tr>
                         <?php
                     }
                 } else {
                     ?>
                     <tr>
-                        <td colspan="4"><?php echo esc_html__('✅ No se detectaron vulnerabilidades', 'aegis-day0'); ?></td>
+                        <td colspan="5"><?php echo esc_html__('✅ No se detectaron vulnerabilidades', 'aegis-day0'); ?></td>
                     </tr>
                     <?php
                 }
                 ?>
             </tbody>
         </table>
+        
+        <div class="notice notice-info" style="margin-top: 20px;">
+            <p>
+                <strong><?php echo esc_html__('ℹ️ Información:', 'aegis-day0'); ?></strong>
+                <?php echo esc_html__('Las alertas con "Riesgo de Falso Positivo Alto" deben ser revisadas manualmente antes de tomar acciones.', 'aegis-day0'); ?>
+            </p>
+        </div>
 
         <h2><?php echo esc_html__('📜 Historial de acciones', 'aegis-day0'); ?></h2>
         <table class="widefat fixed striped">
