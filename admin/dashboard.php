@@ -248,30 +248,6 @@ function aegis_day0_config_page() {
     <?php
 }
 
-/**
- * Registra las configuraciones del plugin
- */
-function aegis_day0_register_settings() {
-    register_setting('aegis_day0_settings_group', 'aegis_day0_auto_deactivate');
-    register_setting('aegis_day0_settings_group', 'aegis_day0_report_frequency');
-    register_setting('aegis_day0_settings_group', 'aegis_day0_report_time');
-    register_setting('aegis_day0_settings_group', 'aegis_day0_report_recipients');
-    register_setting('aegis_day0_settings_group', 'aegis_day0_wpscan_token');
-
-    // Secciones
-    add_settings_section('aegis_day0_general', 'Configuración General', null, 'aegis-day0-config');
-    add_settings_section('aegis_day0_reports', 'Reportes por Email', null, 'aegis-day0-config');
-    add_settings_section('aegis_day0_api', 'API Externas', null, 'aegis-day0-config');
-
-    // Campos
-    add_settings_field('aegis_day0_auto_deactivate', 'Auto-desactivación', 'aegis_day0_auto_deactivate_cb', 'aegis-day0-config', 'aegis_day0_general');
-    add_settings_field('aegis_day0_report_frequency', 'Frecuencia de Reportes', 'aegis_day0_report_frequency_cb', 'aegis-day0-config', 'aegis_day0_reports');
-    add_settings_field('aegis_day0_report_time', 'Hora de Envío', 'aegis_day0_report_time_cb', 'aegis-day0-config', 'aegis_day0_reports');
-    add_settings_field('aegis_day0_report_recipients', 'Destinatarios', 'aegis_day0_report_recipients_cb', 'aegis-day0-config', 'aegis_day0_reports');
-    add_settings_field('aegis_day0_wpscan_token', 'WPScan API Token', 'aegis_day0_wpscan_token_cb', 'aegis-day0-config', 'aegis_day0_api');
-}
-add_action('admin_init', 'aegis_day0_register_settings');
-
 // --- Callbacks de los campos de configuración ---
 
 function aegis_day0_auto_deactivate_cb() {
