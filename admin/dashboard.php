@@ -1,9 +1,13 @@
 <?php
+/**
+ * Registro del menú principal y submenús
+ */
 function aegis_day0_admin_menu() {
     if ( ! current_user_can('manage_options') ) {
         return;
     }
     
+    // Menú principal - Dashboard
     add_menu_page(
         __('Aegis Day0', 'aegis-day0'),
         __('Aegis Day0', 'aegis-day0'),
@@ -13,9 +17,32 @@ function aegis_day0_admin_menu() {
         'dashicons-shield-alt',
         80
     );
+    
+    // Submenú - Dashboard (página por defecto)
+    add_submenu_page(
+        'aegis-day0',
+        __('Dashboard', 'aegis-day0'),
+        __('Dashboard', 'aegis-day0'),
+        'manage_options',
+        'aegis-day0',
+        'aegis_day0_dashboard'
+    );
+    
+    // Submenú - Configuración
+    add_submenu_page(
+        'aegis-day0',
+        __('Configuración', 'aegis-day0'),
+        __('Config', 'aegis-day0'),
+        'manage_options',
+        'aegis-day0-config',
+        'aegis_day0_config'
+    );
 }
 add_action('admin_menu', 'aegis_day0_admin_menu');
 
+/**
+ * Dashboard - Vista de vulnerabilidades y logs
+ */
 function aegis_day0_dashboard() {
     // Verify nonce for export actions
     if (isset($_POST['aegis_day0_export']) && current_user_can('manage_options')) {
@@ -56,7 +83,7 @@ function aegis_day0_dashboard() {
     ?>
     <div class="wrap aegis-day0-dashboard">
         <?php echo $scan_message; ?>
-        <h1><?php echo esc_html__('🛡️ Aegis Day0 - Vulnerabilidades', 'aegis-day0'); ?></h1>
+        <h1><?php echo esc_html__('🛡️ Aegis Day0 - Dashboard', 'aegis-day0'); ?></h1>
         
         <!-- Manual Scan Button -->
         <div style="margin: 20px 0;">
@@ -162,44 +189,115 @@ function aegis_day0_dashboard() {
             </tbody>
         </table>
 
-        <h2><?php echo esc_html__('⚙️ Configuración', 'aegis-day0'); ?></h2>
-        <form method="post" action="options.php">
-            <?php settings_fields('aegis_day0_settings'); ?>
-            <?php do_settings_sections('aegis_day0_settings'); ?>
-            <label>
-                <input type="checkbox" name="aegis_day0_auto_disable" value="1"
-                    <?php checked(1, get_option('aegis_day0_auto_disable', 0)); ?> />
-                <?php echo esc_html__('Desactivar automáticamente plugins vulnerables críticos', 'aegis-day0'); ?>
-            </label><br><br>
-
-            <label for="aegis_day0_report_frequency"><?php echo esc_html__('Frecuencia de reportes:', 'aegis-day0'); ?></label>
-            <select name="aegis_day0_report_frequency" id="aegis_day0_report_frequency">
-                <option value="daily" <?php selected(get_option('aegis_day0_report_frequency'), 'daily'); ?>><?php echo esc_html__('Diario', 'aegis-day0'); ?></option>
-                <option value="weekly" <?php selected(get_option('aegis_day0_report_frequency'), 'weekly'); ?>><?php echo esc_html__('Semanal', 'aegis-day0'); ?></option>
-                <option value="monthly" <?php selected(get_option('aegis_day0_report_frequency'), 'monthly'); ?>><?php echo esc_html__('Mensual', 'aegis-day0'); ?></option>
-            </select><br><br>
-
-            <label for="aegis_day0_report_time"><?php echo esc_html__('Hora de envío:', 'aegis-day0'); ?></label>
-            <input type="time" name="aegis_day0_report_time" id="aegis_day0_report_time"
-                value="<?php echo esc_attr(get_option('aegis_day0_report_time', '08:00')); ?>" /><br><br>
-
-            <label for="aegis_day0_report_recipients"><?php echo esc_html__('Destinatarios del reporte (coma):', 'aegis-day0'); ?></label>
-            <input type="text" name="aegis_day0_report_recipients" id="aegis_day0_report_recipients"
-                value="<?php echo esc_attr(get_option('aegis_day0_report_recipients', '')); ?>" style="width:100%;" /><br><br>
-
-            <label for="aegis_day0_wpscan_token"><?php echo esc_html__('WPScan API Token:', 'aegis-day0'); ?></label>
-            <input type="password" name="aegis_day0_wpscan_token" id="aegis_day0_wpscan_token"
-                value="<?php echo esc_attr(get_option('aegis_day0_wpscan_token', '')); ?>" style="width:100%;" />
-            <p class="description"><?php echo esc_html__('Obtén tu token gratuito en wpscan.com', 'aegis-day0'); ?></p>
-
-            <?php submit_button(); ?>
-        </form>
-
         <h2><?php echo esc_html__('📤 Exportar Logs', 'aegis-day0'); ?></h2>
         <form method="post">
             <?php wp_nonce_field('aegis_day0_export_action', 'aegis_day0_export_nonce'); ?>
             <button type="submit" name="aegis_day0_export" value="csv" class="button button-primary"><?php echo esc_html__('Exportar CSV', 'aegis-day0'); ?></button>
             <button type="submit" name="aegis_day0_export" value="json" class="button"><?php echo esc_html__('Exportar JSON', 'aegis-day0'); ?></button>
+        </form>
+    </div>
+    <?php
+}
+
+/**
+ * Configuración - Vista de ajustes del plugin
+ */
+function aegis_day0_config() {
+    // Handle save message
+    $save_message = '';
+    if (isset($_POST['aegis_day0_save_settings']) && current_user_can('manage_options')) {
+        if (isset($_POST['aegis_day0_config_nonce']) && wp_verify_nonce($_POST['aegis_day0_config_nonce'], 'aegis_day0_config_action')) {
+            // Settings are saved via register_setting automatically
+            $save_message = '<div class="notice notice-success"><p>' . esc_html__('✅ Configuración guardada exitosamente', 'aegis-day0') . '</p></div>';
+        } else {
+            $save_message = '<div class="notice notice-error"><p>' . esc_html__('❌ Error de seguridad al guardar configuración', 'aegis-day0') . '</p></div>';
+        }
+    }
+    ?>
+    <div class="wrap aegis-day0-config">
+        <?php echo $save_message; ?>
+        <h1><?php echo esc_html__('⚙️ Aegis Day0 - Configuración', 'aegis-day0'); ?></h1>
+        
+        <form method="post" action="options.php">
+            <?php settings_fields('aegis_day0_settings'); ?>
+            <?php do_settings_sections('aegis_day0_settings'); ?>
+            
+            <h2><?php echo esc_html__('Configuración General', 'aegis-day0'); ?></h2>
+            <table class="form-table">
+                <tr>
+                    <th scope="row">
+                        <label for="aegis_day0_auto_disable"><?php echo esc_html__('Auto-desactivación', 'aegis-day0'); ?></label>
+                    </th>
+                    <td>
+                        <label>
+                            <input type="checkbox" name="aegis_day0_auto_disable" id="aegis_day0_auto_disable" value="1"
+                                <?php checked(1, get_option('aegis_day0_auto_disable', 0)); ?> />
+                            <?php echo esc_html__('Desactivar automáticamente plugins vulnerables críticos', 'aegis-day0'); ?>
+                        </label>
+                        <p class="description"><?php echo esc_html__('Esta opción desactivará automáticamente los plugins críticos que presenten vulnerabilidades de alta severidad.', 'aegis-day0'); ?></p>
+                    </td>
+                </tr>
+            </table>
+            
+            <h2><?php echo esc_html__('Configuración de Reportes', 'aegis-day0'); ?></h2>
+            <table class="form-table">
+                <tr>
+                    <th scope="row">
+                        <label for="aegis_day0_report_frequency"><?php echo esc_html__('Frecuencia', 'aegis-day0'); ?></label>
+                    </th>
+                    <td>
+                        <select name="aegis_day0_report_frequency" id="aegis_day0_report_frequency">
+                            <option value="daily" <?php selected(get_option('aegis_day0_report_frequency'), 'daily'); ?>><?php echo esc_html__('Diario', 'aegis-day0'); ?></option>
+                            <option value="weekly" <?php selected(get_option('aegis_day0_report_frequency'), 'weekly'); ?>><?php echo esc_html__('Semanal', 'aegis-day0'); ?></option>
+                            <option value="monthly" <?php selected(get_option('aegis_day0_report_frequency'), 'monthly'); ?>><?php echo esc_html__('Mensual', 'aegis-day0'); ?></option>
+                        </select>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">
+                        <label for="aegis_day0_report_time"><?php echo esc_html__('Hora de envío', 'aegis-day0'); ?></label>
+                    </th>
+                    <td>
+                        <input type="time" name="aegis_day0_report_time" id="aegis_day0_report_time"
+                            value="<?php echo esc_attr(get_option('aegis_day0_report_time', '08:00')); ?>" />
+                        <p class="description"><?php echo esc_html__('Hora en la que se enviarán los reportes programados.', 'aegis-day0'); ?></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">
+                        <label for="aegis_day0_report_recipients"><?php echo esc_html__('Destinatarios', 'aegis-day0'); ?></label>
+                    </th>
+                    <td>
+                        <input type="email" name="aegis_day0_report_recipients" id="aegis_day0_report_recipients"
+                            value="<?php echo esc_attr(get_option('aegis_day0_report_recipients', '')); ?>" 
+                            placeholder="<?php echo esc_attr__('admin@example.com, security@example.com', 'aegis-day0'); ?>" 
+                            style="width:100%;" />
+                        <p class="description"><?php echo esc_html__('Correos electrónicos separados por coma para recibir los reportes.', 'aegis-day0'); ?></p>
+                    </td>
+                </tr>
+            </table>
+            
+            <h2><?php echo esc_html__('Integración WPScan', 'aegis-day0'); ?></h2>
+            <table class="form-table">
+                <tr>
+                    <th scope="row">
+                        <label for="aegis_day0_wpscan_token"><?php echo esc_html__('API Token', 'aegis-day0'); ?></label>
+                    </th>
+                    <td>
+                        <input type="password" name="aegis_day0_wpscan_token" id="aegis_day0_wpscan_token"
+                            value="<?php echo esc_attr(get_option('aegis_day0_wpscan_token', '')); ?>" 
+                            style="width:100%; max-width: 400px;" />
+                        <p class="description">
+                            <?php echo esc_html__('Obtén tu token gratuito en', 'aegis-day0'); ?> 
+                            <a href="https://wpscan.com/" target="_blank" rel="noopener noreferrer">wpscan.com</a>
+                        </p>
+                        <p class="description"><?php echo esc_html__('El token se utiliza para consultar la base de datos de vulnerabilidades de WPScan.', 'aegis-day0'); ?></p>
+                    </td>
+                </tr>
+            </table>
+            
+            <?php wp_nonce_field('aegis_day0_config_action', 'aegis_day0_config_nonce'); ?>
+            <?php submit_button(__('Guardar Configuración', 'aegis-day0')); ?>
         </form>
     </div>
     <?php
