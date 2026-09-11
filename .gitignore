@@ -1,36 +1,67 @@
-# Environment and temporary files
-.env
-.env.local
-*.tmp
+```
+# Logs and temp files
 *.log
+*.tmp
 *.swp
 
-# Editor/IDE files
+# Environment
+.env
+.env.local
+*.env.*
+
+# Editors
 .vscode/
 .idea/
 
-# Dependencies and build artifacts
+# Dependencies
 node_modules/
-vendor/
-*.phar
-composer.lock
-
-# Cache directories
-.cache/
+venv/
+.venv/
 __pycache__/
-*.pyc
+.mypy_cache/
+.pytest_cache/
+dist/
+build/
+target/
+.gradle/
 
-# OS specific
+# OS generated files
 .DS_Store
 Thumbs.db
 
-# Backup and compressed files
-*.bak
+# Compiled files
+*.pyc
+*.class
+*.o
+*.exe
+*.dll
+*.so
+*.a
+*.obj
+*.out
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# Compressed files
 *.zip
-*.tar
 *.gz
+*.tar
 *.tgz
 *.bz2
 *.xz
 *.7z
 *.rar
+*.zst
+*.lz4
+*.lzh
+*.cab
+*.arj
+*.rpm
+*.deb
+*.Z
+*.lz
+*.lzo
+```
