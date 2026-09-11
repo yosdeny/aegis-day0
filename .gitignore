@@ -1,36 +1,26 @@
-# Environment and temporary files
+# Examples 1:
+(empty)
+
+# Example 2 (Project with artifacts):
+# Compiled and build artifacts
+*.pyc
+__pycache__/
+*.o
+*.obj
+dist/
+build/
+# Dependencies
+.venv/
+venv/
+node_modules/
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+# Environment
 .env
 .env.local
-*.tmp
-*.log
-*.swp
-
-# Editor/IDE files
+.env.*
+# Editors
 .vscode/
 .idea/
-
-# Dependencies and build artifacts
-node_modules/
-vendor/
-*.phar
-composer.lock
-
-# Cache directories
-.cache/
-__pycache__/
-*.pyc
-
-# OS specific
-.DS_Store
-Thumbs.db
-
-# Backup and compressed files
-*.bak
-*.zip
-*.tar
-*.gz
-*.tgz
-*.bz2
-*.xz
-*.7z
-*.rar
