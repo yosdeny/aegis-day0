@@ -846,19 +846,82 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
     }
 
     /**
-     * Verificar si una concatenación es segura (contiene constantes/funciones seguras)
+     * Verificar si una concatenación es segura (contiene constantes/funciones seguras + strings fijos)
+     * 
+     * Una concatenación se considera segura si:
+     * - Contiene una constante o función segura en un lado
+     * - El otro lado es un string literal (ruta fija hardcodeada)
+     * - No contiene variables ni input de usuario
      */
     private function concatIsSafe($node) {
-        // Revisar lado izquierdo
-        if ($this->isSafePath($node->left)) {
+        // Revisar lado izquierdo y derecho
+        $left = $node->left;
+        $right = $node->right;
+        
+        // Verificar si ambos lados son seguros
+        $leftIsSafeBase = $this->isSafeBase($left);
+        $rightIsSafeBase = $this->isSafeBase($right);
+        
+        $leftIsFixedString = $left instanceof Node\Scalar\String_;
+        $rightIsFixedString = $right instanceof Node\Scalar\String_;
+        
+        // Patrón seguro: base_segura . 'ruta/fija' o 'ruta/fija' . base_segura
+        if (($leftIsSafeBase && $rightIsFixedString) || ($leftIsFixedString && $rightIsSafeBase)) {
             return true;
         }
         
-        // Revisar lado derecho
-        if ($this->isSafePath($node->right)) {
-            return true;
+        // Si es concatenación anidada, verificar recursivamente
+        if ($left instanceof Node\Expr\BinaryOp\Concat) {
+            return $this->concatIsSafe($left) && $rightIsFixedString;
+        }
+        
+        if ($right instanceof Node\Expr\BinaryOp\Concat) {
+            return $this->concatIsSafe($right) && $leftIsFixedString;
         }
 
+        return false;
+    }
+
+    /**
+     * Verificar si un nodo es una "base segura" para construcción de rutas
+     * (constante, función segura, o acceso a propiedad de constante)
+     */
+    private function isSafeBase($node) {
+        // Constantes directas (__DIR__, ABSPATH, etc.)
+        if ($node instanceof Node\Expr\ConstFetch) {
+            return true;
+        }
+        
+        // Llamadas a funciones seguras (plugin_dir_path, etc.)
+        if ($node instanceof Node\Expr\FuncCall) {
+            if ($node->name instanceof Node\Name) {
+                $funcName = $node->name->toString();
+                $safeFunctions = ['plugin_dir_path', 'plugin_dir_url', 'dirname', 'get_template_directory', 'get_stylesheet_directory'];
+                if (in_array($funcName, $safeFunctions)) {
+                    return true;
+                }
+            }
+        }
+        
+        // Acceso a propiedades/constantes de clase (ej: YGB_E2_PLUGIN_DIR)
+        // Esto cubre constantes definidas con define() que se usan como bases de ruta
+        if ($node instanceof Node\Expr\ClassConstFetch) {
+            return true;
+        }
+        
+        // Variable global conocida como base de ruta del plugin
+        // Se verifica por nombre común de constantes de plugins
+        if ($node instanceof Node\Expr\Variable && is_string($node->name)) {
+            // Variables comunes de directorio de plugin
+            $safeVarPatterns = ['/plugin.*dir/i', '/.*_path/i', '/.*_dir/i'];
+            $varName = $node->name;
+            foreach ($safeVarPatterns as $pattern) {
+                if (preg_match($pattern, $varName)) {
+                    return true;
+                }
+            }
+        }
+        
         return false;
     }
 
