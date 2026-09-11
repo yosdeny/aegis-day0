@@ -133,19 +133,6 @@ function aegis_day0_dashboard_page() {
                 </tbody>
             </table>
         <?php endif; ?>
-
-        <!-- Exportar Datos -->
-        <h2 style="margin-top: 40px;">📥 Exportar Datos</h2>
-        <form method="post" action="<?php echo admin_url('admin-post.php'); ?>" style="background: #fff; padding: 20px; border: 1px solid #ccd0d4;">
-            <?php wp_nonce_field('aegis_export_action'); ?>
-            <input type="hidden" name="action" value="aegis_export_data">
-            <label for="export_format">Formato:</label>
-            <select name="format" id="export_format" style="margin: 0 10px;">
-                <option value="csv">CSV</option>
-                <option value="json">JSON</option>
-            </select>
-            <button type="submit" class="button button-secondary">Descargar Reporte</button>
-        </form>
     </div>
     <?php
 }
