@@ -37,9 +37,36 @@ function aegis_day0_dashboard() {
     
     // Generate nonce for export form
     $export_nonce = wp_create_nonce('aegis_day0_export_action');
+    
+    // Nonce for manual scan
+    $scan_nonce = wp_create_nonce('aegis_day0_manual_scan');
+    
+    // Handle manual scan request
+    $scan_message = '';
+    if (isset($_POST['aegis_day0_manual_scan']) && current_user_can('manage_options')) {
+        if (isset($_POST['aegis_day0_scan_nonce']) && wp_verify_nonce($_POST['aegis_day0_scan_nonce'], 'aegis_day0_manual_scan')) {
+            if (function_exists('aegis_day0_force_scan')) {
+                aegis_day0_force_scan();
+                $scan_message = '<div class="notice notice-success"><p>' . esc_html__('✅ Escaneo completado exitosamente', 'aegis-day0') . '</p></div>';
+            }
+        } else {
+            $scan_message = '<div class="notice notice-error"><p>' . esc_html__('❌ Error de seguridad en el escaneo', 'aegis-day0') . '</p></div>';
+        }
+    }
     ?>
     <div class="wrap aegis-day0-dashboard">
+        <?php echo $scan_message; ?>
         <h1><?php echo esc_html__('🛡️ Aegis Day0 - Vulnerabilidades', 'aegis-day0'); ?></h1>
+        
+        <!-- Manual Scan Button -->
+        <div style="margin: 20px 0;">
+            <form method="post">
+                <?php wp_nonce_field('aegis_day0_manual_scan', 'aegis_day0_scan_nonce'); ?>
+                <button type="submit" name="aegis_day0_manual_scan" class="button button-primary">
+                    <?php echo esc_html__('🔄 Ejecutar Escaneo Ahora', 'aegis-day0'); ?>
+                </button>
+            </form>
+        </div>
         
         <h2><?php echo esc_html__('Alertas detectadas', 'aegis-day0'); ?></h2>
         <table class="widefat fixed striped">

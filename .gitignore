@@ -1,38 +1,36 @@
-```
-# PHP related
-*.php~
-
-# Temporary and backup files
-*.tmp
-*.bak
-*.backup
-*~
-.#*
-
-# Logs
-*.log
-
-# Environment specific
+# Environment and temporary files
 .env
 .env.local
-.env.*
+*.tmp
+*.log
+*.swp
 
-# Dependencies
-vendor/
-
-# IDE and editor files
+# Editor/IDE files
 .vscode/
 .idea/
-*.swp
-*.swo
 
-# OS generated files
+# Dependencies and build artifacts
+node_modules/
+vendor/
+*.phar
+composer.lock
+
+# Cache directories
+.cache/
+__pycache__/
+*.pyc
+
+# OS specific
 .DS_Store
 Thumbs.db
 
-# Test files (if they follow common patterns)
-*.test.php
-*_test.php
-test_*.php
-tests/
-```
+# Backup and compressed files
+*.bak
+*.zip
+*.tar
+*.gz
+*.tgz
+*.bz2
+*.xz
+*.7z
+*.rar
