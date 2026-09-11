@@ -1,1 +1,49 @@
-Nothing needs to be added to .gitignore since the changes only include PHP source files (.php) which are not build artifacts, dependencies, or temporary files.
+```php
+# PHP-specific ignores
+*.php~
+*.php.bak
+*.phar
+*.pid
+*.lock
+
+# Cache and temporary files
+.cache/
+*.cache
+tmp/
+temp/
+*.tmp
+*.log
+
+# Dependencies and packages
+vendor/
+composer.lock
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Environment and configuration
+.env
+.env.local
+*.env.*
+
+# Build and distribution
+build/
+dist/
+*.tar
+*.gz
+*.zip
+
+# Testing
+.phpunit.result.cache
+coverage/
+
+# OS generated files
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+```
