@@ -79,6 +79,22 @@ class Aegis_AST_Analyzer {
     ];
 
     /**
+     * Métodos peligrosos de clases (ej. $wpdb->query)
+     */
+    private $dangerous_methods = [
+        // WordPress WPDB methods
+        'query' => ['type' => 'sql_query', 'severity' => 'high', 'class' => 'wpdb', 'false_positive_risk' => 'medium'],
+        'get_var' => ['type' => 'sql_query', 'severity' => 'high', 'class' => 'wpdb', 'false_positive_risk' => 'medium'],
+        'get_row' => ['type' => 'sql_query', 'severity' => 'high', 'class' => 'wpdb', 'false_positive_risk' => 'medium'],
+        'get_col' => ['type' => 'sql_query', 'severity' => 'high', 'class' => 'wpdb', 'false_positive_risk' => 'medium'],
+        'get_results' => ['type' => 'sql_query', 'severity' => 'high', 'class' => 'wpdb', 'false_positive_risk' => 'medium'],
+        'insert' => ['type' => 'sql_query', 'severity' => 'medium', 'class' => 'wpdb', 'false_positive_risk' => 'high'],
+        'update' => ['type' => 'sql_query', 'severity' => 'medium', 'class' => 'wpdb', 'false_positive_risk' => 'high'],
+        'delete' => ['type' => 'sql_query', 'severity' => 'medium', 'class' => 'wpdb', 'false_positive_risk' => 'high'],
+        'replace' => ['type' => 'sql_query', 'severity' => 'medium', 'class' => 'wpdb', 'false_positive_risk' => 'high'],
+    ];
+
+    /**
      * Funciones de sanitización reconocidas
      */
     private $sanitizing_functions = [
@@ -264,6 +280,33 @@ class Aegis_AST_Analyzer {
         return isset($this->dangerous_functions[$func_lower]) 
             ? $this->dangerous_functions[$func_lower] 
             : null;
+    }
+
+    /**
+     * Obtiene información de un método peligroso de clase
+     *
+     * @param string $method_name Nombre del método
+     * @param string|null $class_name Nombre de la clase (opcional)
+     * @return array|null Información del método o null si no es peligroso
+     */
+    public function get_method_info($method_name, $class_name = null) {
+        $method_lower = strtolower($method_name);
+        
+        if (!isset($this->dangerous_methods[$method_lower])) {
+            return null;
+        }
+        
+        $method_info = $this->dangerous_methods[$method_lower];
+        
+        // Si se especifica clase, verificar que coincida
+        if ($class_name !== null) {
+            $class_lower = strtolower($class_name);
+            if (isset($method_info['class']) && strtolower($method_info['class']) !== $class_lower) {
+                return null;
+            }
+        }
+        
+        return $method_info;
     }
 
     /**
@@ -516,6 +559,11 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
             $this->analyzeFunctionCall($node);
         }
         
+        // Detectar métodos peligrosos en objetos (ej. $wpdb->get_var)
+        if ($node instanceof Node\Expr\MethodCall) {
+            $this->analyzeMethodCall($node);
+        }
+        
         // Detectar construcciones de lenguaje peligrosas
         if ($node instanceof Node\Stmt\Expression) {
             $this->analyzeExpression($node);
@@ -733,6 +781,126 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
                 ),
                 'uses_user_input' => $uses_user_input,
                 'recommendation' => __('Usar rutas absolutas con realpath(). Implementar whitelist estricta de archivos.', 'aegis-day0')
+            ]);
+        }
+    }
+
+    /**
+     * Analiza llamada a método de objeto (ej. $wpdb->get_var)
+     */
+    private function analyzeMethodCall(Node\Expr\MethodCall $node) {
+        $method_name = $node->name;
+        
+        // Solo analizar si el nombre del método es un string
+        if (!($method_name instanceof Node\Identifier)) {
+            return;
+        }
+        
+        $method_str = $method_name->toString();
+        
+        // Verificar si el objeto es una instancia de wpdb
+        $var = $node->var;
+        $is_wpdb = false;
+        
+        if ($var instanceof Node\Expr\Variable && is_string($var->name)) {
+            // Verificar si es $wpdb
+            if ($var->name === 'wpdb') {
+                $is_wpdb = true;
+            }
+        }
+        
+        // Si no es wpdb, verificar por tipo inferido
+        if (!$is_wpdb) {
+            // Podríamos implementar type inference aquí en el futuro
+            return;
+        }
+        
+        // Obtener información del método peligroso
+        $method_info = $this->analyzer->get_method_info($method_str, 'wpdb');
+        
+        if (!$method_info) {
+            return;
+        }
+        
+        $line = $node->getLine();
+        $uses_user_input = false;
+        $is_sanitized = false;
+        
+        // Analizar argumentos para SQL injection
+        foreach ($node->args as $arg) {
+            if ($arg instanceof Node\Arg) {
+                $value = $arg->value;
+                
+                // Verificar si usa input de usuario directo
+                if ($this->analyzer->is_superglobal_access($value)) {
+                    $uses_user_input = true;
+                }
+                
+                // Verificar variables
+                if ($value instanceof Node\Expr\Variable) {
+                    $var_name = $this->analyzer->get_variable_name($value);
+                    if ($var_name) {
+                        if (in_array($var_name, $this->user_input_vars, true)) {
+                            $uses_user_input = true;
+                        }
+                        if (in_array($var_name, $this->sanitized_vars, true)) {
+                            $is_sanitized = true;
+                        }
+                    }
+                }
+                
+                // Verificar concatenaciones (SQL injection común)
+                if ($value instanceof Node\Expr\BinaryOp\Concat) {
+                    if ($this->containsUnsanitizedUserInput($value)) {
+                        $uses_user_input = true;
+                    }
+                }
+            }
+        }
+        
+        // Calcular severidad ajustada
+        $adjusted_severity = $method_info['severity'];
+        $false_positive_risk = $method_info['false_positive_risk'];
+        
+        // Si hay concatenación con input de usuario, aumentar severidad
+        if ($uses_user_input && !$is_sanitized) {
+            if ($method_info['severity'] === 'medium') {
+                $adjusted_severity = 'high';
+            } elseif ($method_info['severity'] === 'high') {
+                $adjusted_severity = 'critical';
+            }
+            $false_positive_risk = 'low';
+        } elseif ($is_sanitized) {
+            $adjusted_severity = 'low';
+            $false_positive_risk = 'high';
+        }
+        
+        // Generar alerta
+        if ($adjusted_severity !== 'low' || $uses_user_input) {
+            $description = sprintf(
+                __('Método %s::%s() detectado. %s', 'aegis-day0'),
+                'wpdb',
+                $method_str,
+                $uses_user_input 
+                    ? __('Posible uso de input de usuario sin sanitización - Riesgo de SQL Injection.', 'aegis-day0')
+                    : __('Verificar que se use $wpdb->prepare() para consultas con variables.', 'aegis-day0')
+            );
+            
+            $recommendation = $uses_user_input && !$is_sanitized
+                ? __('USAR $wpdb->prepare() para todas las consultas con variables. NUNCA concatenar $_GET/$_POST directamente.', 'aegis-day0')
+                : __('Asegurar que todas las variables estén sanitizadas antes de usarlas en consultas SQL.', 'aegis-day0');
+            
+            $this->analyzer->add_alert([
+                'type' => $method_info['type'],
+                'function' => '$wpdb->' . $method_str,
+                'file' => $this->analyzer->get_current_file(),
+                'line' => $line,
+                'severity' => ucfirst($adjusted_severity),
+                'false_positive_risk' => $false_positive_risk,
+                'description' => $description,
+                'uses_user_input' => $uses_user_input,
+                'is_sanitized' => $is_sanitized,
+                'recommendation' => $recommendation
             ]);
         }
     }
