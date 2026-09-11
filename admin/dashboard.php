@@ -1,304 +1,320 @@
 <?php
 /**
- * Registro del menú principal y submenús
+ * Dashboard y Administración del Plugin Aegis Day0
+ * 
+ * @package AegisDay0
+ */
+
+if (!defined('ABSPATH')) exit;
+
+/**
+ * Registra el menú principal y submenús
  */
 function aegis_day0_admin_menu() {
-    if ( ! current_user_can('manage_options') ) {
-        return;
-    }
-    
-    // Menú principal - Dashboard
+    // Menú Principal
     add_menu_page(
-        __('Aegis Day0', 'aegis-day0'),
-        __('Aegis Day0', 'aegis-day0'),
+        'Aegis Day0',
+        'Aegis Day0',
         'manage_options',
         'aegis-day0',
-        'aegis_day0_dashboard',
+        'aegis_day0_dashboard_page',
         'dashicons-shield-alt',
-        80
+        99
     );
-    
-    // Submenú - Dashboard (página por defecto)
+
+    // Submenú 1: Dashboard (Vulnerabilidades Activas) - Página por defecto
     add_submenu_page(
         'aegis-day0',
-        __('Dashboard', 'aegis-day0'),
-        __('Dashboard', 'aegis-day0'),
+        'Dashboard - Vulnerabilidades',
+        'Dashboard',
         'manage_options',
         'aegis-day0',
-        'aegis_day0_dashboard'
+        'aegis_day0_dashboard_page'
     );
-    
-    // Submenú - Configuración
+
+    // Submenú 2: Logs (Histórico de Acciones)
     add_submenu_page(
         'aegis-day0',
-        __('Configuración', 'aegis-day0'),
-        __('Config', 'aegis-day0'),
+        'Historial de Acciones',
+        'Logs',
+        'manage_options',
+        'aegis-day0-logs',
+        'aegis_day0_logs_page'
+    );
+
+    // Submenú 3: Configuración
+    add_submenu_page(
+        'aegis-day0',
+        'Configuración',
+        'Config',
         'manage_options',
         'aegis-day0-config',
-        'aegis_day0_config'
+        'aegis_day0_config_page'
     );
 }
 add_action('admin_menu', 'aegis_day0_admin_menu');
 
 /**
- * Dashboard - Vista de vulnerabilidades y logs
+ * Maneja la acción de limpiar logs
  */
-function aegis_day0_dashboard() {
-    // Verify nonce for export actions
-    if (isset($_POST['aegis_day0_export']) && current_user_can('manage_options')) {
-        if (!isset($_POST['aegis_day0_export_nonce']) || !wp_verify_nonce($_POST['aegis_day0_export_nonce'], 'aegis_day0_export_action')) {
-            wp_die(__('Security check failed', 'aegis-day0'));
-        }
-        
-        $format = sanitize_text_field($_POST['aegis_day0_export']);
-        $output = Aegis_Day0_Logger::export_logs($format);
-        
-        if (!empty($output)) {
-            $filename = 'aegis-day0-logs-' . date('Y-m-d-H-i-s') . '.' . $format;
-            header('Content-Type: text/' . ($format === 'json' ? 'json' : 'csv'));
-            header('Content-Disposition: attachment; filename="' . $filename . '"');
-            echo $output;
+function aegis_day0_handle_clear_logs() {
+    if (isset($_POST['aegis_clear_logs']) && check_admin_referer('aegis_clear_logs_action')) {
+        if (current_user_can('manage_options')) {
+            delete_option('aegis_day0_scan_logs');
+            wp_redirect(admin_url('admin.php?page=aegis-day0-logs&cleared=1'));
             exit;
         }
     }
-    
-    // Generate nonce for export form
-    $export_nonce = wp_create_nonce('aegis_day0_export_action');
-    
-    // Nonce for manual scan
-    $scan_nonce = wp_create_nonce('aegis_day0_manual_scan');
-    
-    // Handle manual scan request
-    $scan_message = '';
-    if (isset($_POST['aegis_day0_manual_scan']) && current_user_can('manage_options')) {
-        if (isset($_POST['aegis_day0_scan_nonce']) && wp_verify_nonce($_POST['aegis_day0_scan_nonce'], 'aegis_day0_manual_scan')) {
-            if (function_exists('aegis_day0_force_scan')) {
-                aegis_day0_force_scan();
-                $scan_message = '<div class="notice notice-success"><p>' . esc_html__('✅ Escaneo completado exitosamente', 'aegis-day0') . '</p></div>';
-            }
-        } else {
-            $scan_message = '<div class="notice notice-error"><p>' . esc_html__('❌ Error de seguridad en el escaneo', 'aegis-day0') . '</p></div>';
+}
+add_action('admin_init', 'aegis_day0_handle_clear_logs');
+
+/**
+ * Renderiza la página del Dashboard
+ */
+function aegis_day0_dashboard_page() {
+    // Forzar escaneo si se solicita
+    if (isset($_POST['force_scan']) && check_admin_referer('aegis_force_scan_action')) {
+        if (function_exists('aegis_day0_run_scan')) {
+            aegis_day0_run_scan();
+            echo '<div class="notice notice-success is-dismissible"><p>✅ Escaneo forzado completado con éxito.</p></div>';
         }
     }
+
+    $alerts = get_option('aegis_day0_alerts', []);
     ?>
-    <div class="wrap aegis-day0-dashboard">
-        <?php echo $scan_message; ?>
-        <h1><?php echo esc_html__('🛡️ Aegis Day0 - Dashboard', 'aegis-day0'); ?></h1>
+    <div class="wrap">
+        <h1 style="margin-bottom: 20px;">🛡️ Dashboard de Seguridad</h1>
         
-        <!-- Manual Scan Button -->
-        <div style="margin: 20px 0;">
-            <form method="post">
-                <?php wp_nonce_field('aegis_day0_manual_scan', 'aegis_day0_scan_nonce'); ?>
-                <button type="submit" name="aegis_day0_manual_scan" class="button button-primary">
-                    <?php echo esc_html__('🔄 Ejecutar Escaneo Ahora', 'aegis-day0'); ?>
-                </button>
-            </form>
-        </div>
-        
-        <h2><?php echo esc_html__('Alertas detectadas', 'aegis-day0'); ?></h2>
-        <table class="widefat fixed striped">
-            <thead>
-                <tr>
-                    <th><?php echo esc_html__('Plugin', 'aegis-day0'); ?></th>
-                    <th><?php echo esc_html__('Tipo', 'aegis-day0'); ?></th>
-                    <th><?php echo esc_html__('Severidad', 'aegis-day0'); ?></th>
-                    <th><?php echo esc_html__('Fuente', 'aegis-day0'); ?></th>
-                    <th><?php echo esc_html__('Riesgo Falso Positivo', 'aegis-day0'); ?></th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php
-                $alerts = get_option('aegis_day0_alerts', []);
-                if (!empty($alerts)) {
-                    foreach ($alerts as $alert) {
-                        $fp_risk = isset($alert['false_positive_risk']) ? $alert['false_positive_risk'] : 'unknown';
-                        $fp_indicator = '';
-                        if ($fp_risk === 'high') {
-                            $fp_indicator = '⚠️ ' . esc_html__('Alto', 'aegis-day0');
-                        } elseif ($fp_risk === 'medium') {
-                            $fp_indicator = '◐ ' . esc_html__('Medio', 'aegis-day0');
-                        } elseif ($fp_risk === 'low') {
-                            $fp_indicator = '✓ ' . esc_html__('Bajo', 'aegis-day0');
-                        } else {
-                            $fp_indicator = '? ' . esc_html__('Desconocido', 'aegis-day0');
-                        }
-                        ?>
-                        <tr>
-                            <td><?php echo esc_html($alert['plugin']); ?></td>
-                            <td><?php echo esc_html($alert['type']); ?></td>
-                            <td><?php echo esc_html($alert['severity']); ?></td>
-                            <td><?php echo esc_html($alert['source']); ?></td>
-                            <td><?php echo $fp_indicator; ?></td>
-                        </tr>
-                        <?php
-                    }
-                } else {
+        <!-- Botón de Escaneo Manual -->
+        <form method="post" style="margin-bottom: 30px; background: #f0f0f1; padding: 20px; border-radius: 4px;">
+            <?php wp_nonce_field('aegis_force_scan_action'); ?>
+            <button type="submit" name="force_scan" class="button button-primary button-large">
+                🔄 Ejecutar Escaneo Ahora
+            </button>
+            <span style="margin-left: 10px; color: #666;">Escanea todos los plugins en busca de vulnerabilidades 0-day</span>
+        </form>
+
+        <!-- Tabla de Vulnerabilidades -->
+        <h2>⚠️ Vulnerabilidades Detectadas</h2>
+        <?php if (empty($alerts)) : ?>
+            <div class="notice notice-success inline"><p>✅ No se detectaron vulnerabilidades activas en este momento.</p></div>
+        <?php else : ?>
+            <table class="wp-list-table widefat fixed striped">
+                <thead>
+                    <tr>
+                        <th style="width: 20%;">Plugin</th>
+                        <th style="width: 35%;">Tipo</th>
+                        <th style="width: 10%;">Severidad</th>
+                        <th style="width: 15%;">Fuente</th>
+                        <th style="width: 20%;">Riesgo Falso Positivo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($alerts as $alert) : 
+                        $fp_risk = isset($alert['false_positive_risk']) ? $alert['false_positive_risk'] : 'Desconocido';
+                        $icon = ($fp_risk === 'Alto') ? '⚠️' : (($fp_risk === 'Medio') ? '◐' : '✅');
+                        $severity_color = ($alert['severity'] === 'Critical') ? 'red' : 'orange';
                     ?>
                     <tr>
-                        <td colspan="5"><?php echo esc_html__('✅ No se detectaron vulnerabilidades', 'aegis-day0'); ?></td>
+                        <td><strong><?php echo esc_html($alert['plugin']); ?></strong></td>
+                        <td><?php echo esc_html($alert['type']); ?></td>
+                        <td><span style="color: <?php echo $severity_color; ?>; font-weight: bold;"><?php echo esc_html($alert['severity']); ?></span></td>
+                        <td><?php echo esc_html($alert['source']); ?></td>
+                        <td><?php echo $icon . ' ' . esc_html($fp_risk); ?></td>
                     </tr>
-                    <?php
-                }
-                ?>
-            </tbody>
-        </table>
-        
-        <div class="notice notice-info" style="margin-top: 20px;">
-            <p>
-                <strong><?php echo esc_html__('ℹ️ Información:', 'aegis-day0'); ?></strong>
-                <?php echo esc_html__('Las alertas con "Riesgo de Falso Positivo Alto" deben ser revisadas manualmente antes de tomar acciones.', 'aegis-day0'); ?>
-            </p>
-        </div>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php endif; ?>
 
-        <h2><?php echo esc_html__('📜 Historial de acciones', 'aegis-day0'); ?></h2>
-        <table class="widefat fixed striped">
-            <thead>
-                <tr>
-                    <th><?php echo esc_html__('Fecha', 'aegis-day0'); ?></th>
-                    <th><?php echo esc_html__('Plugin', 'aegis-day0'); ?></th>
-                    <th><?php echo esc_html__('Tipo', 'aegis-day0'); ?></th>
-                    <th><?php echo esc_html__('Severidad', 'aegis-day0'); ?></th>
-                    <th><?php echo esc_html__('Fuente', 'aegis-day0'); ?></th>
-                    <th><?php echo esc_html__('Acción', 'aegis-day0'); ?></th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php
-                $logs = Aegis_Day0_Logger::get_logs();
-                if (!empty($logs)) {
-                    foreach ($logs as $log) {
-                        ?>
-                        <tr>
-                            <td><?php echo esc_html($log['date']); ?></td>
-                            <td><?php echo esc_html($log['plugin']); ?></td>
-                            <td><?php echo esc_html($log['type']); ?></td>
-                            <td><?php echo esc_html($log['severity']); ?></td>
-                            <td><?php echo esc_html($log['source']); ?></td>
-                            <td><?php echo esc_html($log['action']); ?></td>
-                        </tr>
-                        <?php
-                    }
-                } else {
-                    ?>
-                    <tr>
-                        <td colspan="6"><?php echo esc_html__('No hay registros aún', 'aegis-day0'); ?></td>
-                    </tr>
-                    <?php
-                }
-                ?>
-            </tbody>
-        </table>
-
-        <h2><?php echo esc_html__('📤 Exportar Logs', 'aegis-day0'); ?></h2>
-        <form method="post">
-            <?php wp_nonce_field('aegis_day0_export_action', 'aegis_day0_export_nonce'); ?>
-            <button type="submit" name="aegis_day0_export" value="csv" class="button button-primary"><?php echo esc_html__('Exportar CSV', 'aegis-day0'); ?></button>
-            <button type="submit" name="aegis_day0_export" value="json" class="button"><?php echo esc_html__('Exportar JSON', 'aegis-day0'); ?></button>
+        <!-- Exportar Datos -->
+        <h2 style="margin-top: 40px;">📥 Exportar Datos</h2>
+        <form method="post" action="<?php echo admin_url('admin-post.php'); ?>" style="background: #fff; padding: 20px; border: 1px solid #ccd0d4;">
+            <?php wp_nonce_field('aegis_export_action'); ?>
+            <input type="hidden" name="action" value="aegis_export_data">
+            <label for="export_format">Formato:</label>
+            <select name="format" id="export_format" style="margin: 0 10px;">
+                <option value="csv">CSV</option>
+                <option value="json">JSON</option>
+            </select>
+            <button type="submit" class="button button-secondary">Descargar Reporte</button>
         </form>
     </div>
     <?php
 }
 
 /**
- * Configuración - Vista de ajustes del plugin
+ * Renderiza la página de Logs (Histórico)
  */
-function aegis_day0_config() {
-    // Handle save message
-    $save_message = '';
-    if (isset($_POST['aegis_day0_save_settings']) && current_user_can('manage_options')) {
-        if (isset($_POST['aegis_day0_config_nonce']) && wp_verify_nonce($_POST['aegis_day0_config_nonce'], 'aegis_day0_config_action')) {
-            // Settings are saved via register_setting automatically
-            $save_message = '<div class="notice notice-success"><p>' . esc_html__('✅ Configuración guardada exitosamente', 'aegis-day0') . '</p></div>';
-        } else {
-            $save_message = '<div class="notice notice-error"><p>' . esc_html__('❌ Error de seguridad al guardar configuración', 'aegis-day0') . '</p></div>';
-        }
-    }
+function aegis_day0_logs_page() {
+    $logs = get_option('aegis_day0_scan_logs', []);
+    
+    // Paginación simple
+    $per_page = 50;
+    $current_page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
+    $total_logs = count($logs);
+    $total_pages = ceil($total_logs / $per_page);
+    $offset = ($current_page - 1) * $per_page;
+    
+    // Invertir orden para mostrar más recientes primero, luego aplicar paginación
+    $reversed_logs = array_reverse($logs);
+    $paged_logs = array_slice($reversed_logs, $offset, $per_page);
     ?>
-    <div class="wrap aegis-day0-config">
-        <?php echo $save_message; ?>
-        <h1><?php echo esc_html__('⚙️ Aegis Day0 - Configuración', 'aegis-day0'); ?></h1>
+    <div class="wrap">
+        <h1 style="margin-bottom: 20px;">📜 Historial de Acciones y Escaneos</h1>
         
-        <form method="post" action="options.php">
-            <?php settings_fields('aegis_day0_settings'); ?>
-            <?php do_settings_sections('aegis_day0_settings'); ?>
-            
-            <h2><?php echo esc_html__('Configuración General', 'aegis-day0'); ?></h2>
-            <table class="form-table">
-                <tr>
-                    <th scope="row">
-                        <label for="aegis_day0_auto_disable"><?php echo esc_html__('Auto-desactivación', 'aegis-day0'); ?></label>
-                    </th>
-                    <td>
-                        <label>
-                            <input type="checkbox" name="aegis_day0_auto_disable" id="aegis_day0_auto_disable" value="1"
-                                <?php checked(1, get_option('aegis_day0_auto_disable', 0)); ?> />
-                            <?php echo esc_html__('Desactivar automáticamente plugins vulnerables críticos', 'aegis-day0'); ?>
-                        </label>
-                        <p class="description"><?php echo esc_html__('Esta opción desactivará automáticamente los plugins críticos que presenten vulnerabilidades de alta severidad.', 'aegis-day0'); ?></p>
-                    </td>
-                </tr>
+        <?php if (isset($_GET['cleared'])) : ?>
+            <div class="notice notice-success is-dismissible"><p>🗑️ Historial limpiado correctamente.</p></div>
+        <?php endif; ?>
+
+        <!-- Botón Limpiar Todo -->
+        <form method="post" style="margin-bottom: 20px;" onsubmit="return confirm('⚠️ ¿Estás SEGURO de borrar TODO el historial?\n\nEsta acción no se puede deshacer.');">
+            <?php wp_nonce_field('aegis_clear_logs_action'); ?>
+            <button type="submit" name="aegis_clear_logs" class="button button-link-delete" style="border-color: #d63638; color: #d63638;">
+                🗑️ Limpiar Todo el Historial
+            </button>
+        </form>
+
+        <?php if (empty($logs)) : ?>
+            <div class="notice notice-info"><p>ℹ️ No hay registros históricos disponibles.</p></div>
+        <?php else : ?>
+            <table class="wp-list-table widefat fixed striped">
+                <thead>
+                    <tr>
+                        <th style="width: 15%;">Fecha</th>
+                        <th style="width: 15%;">Plugin</th>
+                        <th style="width: 25%;">Tipo</th>
+                        <th style="width: 10%;">Severidad</th>
+                        <th style="width: 10%;">Fuente</th>
+                        <th style="width: 25%;">Detalle</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($paged_logs as $log) : ?>
+                    <tr>
+                        <td><?php echo esc_html($log['timestamp']); ?></td>
+                        <td><?php echo esc_html($log['plugin']); ?></td>
+                        <td><?php echo esc_html($log['type']); ?></td>
+                        <td><?php echo esc_html($log['severity']); ?></td>
+                        <td><?php echo esc_html($log['source']); ?></td>
+                        <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="<?php echo esc_attr($log['detail']); ?>">
+                            <?php echo esc_html($log['detail']); ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
             </table>
-            
-            <h2><?php echo esc_html__('Configuración de Reportes', 'aegis-day0'); ?></h2>
-            <table class="form-table">
-                <tr>
-                    <th scope="row">
-                        <label for="aegis_day0_report_frequency"><?php echo esc_html__('Frecuencia', 'aegis-day0'); ?></label>
-                    </th>
-                    <td>
-                        <select name="aegis_day0_report_frequency" id="aegis_day0_report_frequency">
-                            <option value="daily" <?php selected(get_option('aegis_day0_report_frequency'), 'daily'); ?>><?php echo esc_html__('Diario', 'aegis-day0'); ?></option>
-                            <option value="weekly" <?php selected(get_option('aegis_day0_report_frequency'), 'weekly'); ?>><?php echo esc_html__('Semanal', 'aegis-day0'); ?></option>
-                            <option value="monthly" <?php selected(get_option('aegis_day0_report_frequency'), 'monthly'); ?>><?php echo esc_html__('Mensual', 'aegis-day0'); ?></option>
-                        </select>
-                    </td>
-                </tr>
-                <tr>
-                    <th scope="row">
-                        <label for="aegis_day0_report_time"><?php echo esc_html__('Hora de envío', 'aegis-day0'); ?></label>
-                    </th>
-                    <td>
-                        <input type="time" name="aegis_day0_report_time" id="aegis_day0_report_time"
-                            value="<?php echo esc_attr(get_option('aegis_day0_report_time', '08:00')); ?>" />
-                        <p class="description"><?php echo esc_html__('Hora en la que se enviarán los reportes programados.', 'aegis-day0'); ?></p>
-                    </td>
-                </tr>
-                <tr>
-                    <th scope="row">
-                        <label for="aegis_day0_report_recipients"><?php echo esc_html__('Destinatarios', 'aegis-day0'); ?></label>
-                    </th>
-                    <td>
-                        <input type="email" name="aegis_day0_report_recipients" id="aegis_day0_report_recipients"
-                            value="<?php echo esc_attr(get_option('aegis_day0_report_recipients', '')); ?>" 
-                            placeholder="<?php echo esc_attr__('admin@example.com, security@example.com', 'aegis-day0'); ?>" 
-                            style="width:100%;" />
-                        <p class="description"><?php echo esc_html__('Correos electrónicos separados por coma para recibir los reportes.', 'aegis-day0'); ?></p>
-                    </td>
-                </tr>
-            </table>
-            
-            <h2><?php echo esc_html__('Integración WPScan', 'aegis-day0'); ?></h2>
-            <table class="form-table">
-                <tr>
-                    <th scope="row">
-                        <label for="aegis_day0_wpscan_token"><?php echo esc_html__('API Token', 'aegis-day0'); ?></label>
-                    </th>
-                    <td>
-                        <input type="password" name="aegis_day0_wpscan_token" id="aegis_day0_wpscan_token"
-                            value="<?php echo esc_attr(get_option('aegis_day0_wpscan_token', '')); ?>" 
-                            style="width:100%; max-width: 400px;" />
-                        <p class="description">
-                            <?php echo esc_html__('Obtén tu token gratuito en', 'aegis-day0'); ?> 
-                            <a href="https://wpscan.com/" target="_blank" rel="noopener noreferrer">wpscan.com</a>
-                        </p>
-                        <p class="description"><?php echo esc_html__('El token se utiliza para consultar la base de datos de vulnerabilidades de WPScan.', 'aegis-day0'); ?></p>
-                    </td>
-                </tr>
-            </table>
-            
-            <?php wp_nonce_field('aegis_day0_config_action', 'aegis_day0_config_nonce'); ?>
-            <?php submit_button(__('Guardar Configuración', 'aegis-day0')); ?>
+
+            <!-- Paginación -->
+            <?php if ($total_pages > 1) : ?>
+                <div class="tablenav">
+                    <div class="tablenav-pages">
+                        <span class="displaying-num"><?php echo number_format($total_logs); ?> elementos en total</span>
+                        <?php
+                        echo paginate_links([
+                            'base' => add_query_arg('paged', '%#%'),
+                            'format' => '',
+                            'prev_text' => '&laquo; Anterior',
+                            'next_text' => 'Siguiente &raquo;',
+                            'total' => $total_pages,
+                            'current' => $current_page,
+                            'mid_size' => 2
+                        ]);
+                        ?>
+                    </div>
+                </div>
+            <?php endif; ?>
+        <?php endif; ?>
+    </div>
+    <?php
+}
+
+/**
+ * Renderiza la página de Configuración
+ */
+function aegis_day0_config_page() {
+    settings_errors();
+    ?>
+    <div class="wrap">
+        <h1 style="margin-bottom: 20px;">⚙️ Configuración de Aegis Day0</h1>
+        <form method="post" action="options.php" style="background: #fff; padding: 20px; border: 1px solid #ccd0d4; max-width: 800px;">
+            <?php
+            settings_fields('aegis_day0_settings_group');
+            do_settings_sections('aegis_day0_settings_group');
+            submit_button('Guardar Configuración', 'primary', 'submit', true, ['style' => 'margin-top: 20px;']);
+            ?>
         </form>
     </div>
+    <?php
+}
+
+/**
+ * Registra las configuraciones del plugin
+ */
+function aegis_day0_register_settings() {
+    register_setting('aegis_day0_settings_group', 'aegis_day0_auto_deactivate');
+    register_setting('aegis_day0_settings_group', 'aegis_day0_report_frequency');
+    register_setting('aegis_day0_settings_group', 'aegis_day0_report_time');
+    register_setting('aegis_day0_settings_group', 'aegis_day0_report_recipients');
+    register_setting('aegis_day0_settings_group', 'aegis_day0_wpscan_token');
+
+    // Secciones
+    add_settings_section('aegis_day0_general', 'Configuración General', null, 'aegis-day0-config');
+    add_settings_section('aegis_day0_reports', 'Reportes por Email', null, 'aegis-day0-config');
+    add_settings_section('aegis_day0_api', 'API Externas', null, 'aegis-day0-config');
+
+    // Campos
+    add_settings_field('aegis_day0_auto_deactivate', 'Auto-desactivación', 'aegis_day0_auto_deactivate_cb', 'aegis-day0-config', 'aegis_day0_general');
+    add_settings_field('aegis_day0_report_frequency', 'Frecuencia de Reportes', 'aegis_day0_report_frequency_cb', 'aegis-day0-config', 'aegis_day0_reports');
+    add_settings_field('aegis_day0_report_time', 'Hora de Envío', 'aegis_day0_report_time_cb', 'aegis-day0-config', 'aegis_day0_reports');
+    add_settings_field('aegis_day0_report_recipients', 'Destinatarios', 'aegis_day0_report_recipients_cb', 'aegis-day0-config', 'aegis_day0_reports');
+    add_settings_field('aegis_day0_wpscan_token', 'WPScan API Token', 'aegis_day0_wpscan_token_cb', 'aegis-day0-config', 'aegis_day0_api');
+}
+add_action('admin_init', 'aegis_day0_register_settings');
+
+// --- Callbacks de los campos de configuración ---
+
+function aegis_day0_auto_deactivate_cb() {
+    $value = get_option('aegis_day0_auto_deactivate', 1);
+    ?>
+    <label>
+        <input type="checkbox" name="aegis_day0_auto_deactivate" value="1" <?php checked($value, 1); ?>>
+        Desactivar plugins críticos automáticamente si tienen vulnerabilidad crítica
+    </label>
+    <p class="description">Si se marca, los plugins considerados "críticos" se desactivarán solos si se detecta una vulnerabilidad de severidad Critical.</p>
+    <?php
+}
+
+function aegis_day0_report_frequency_cb() {
+    $value = get_option('aegis_day0_report_frequency', 'weekly');
+    ?>
+    <select name="aegis_day0_report_frequency">
+        <option value="daily" <?php selected($value, 'daily'); ?>>Diario</option>
+        <option value="weekly" <?php selected($value, 'weekly'); ?>>Semanal (Recomendado)</option>
+        <option value="monthly" <?php selected($value, 'monthly'); ?>>Mensual</option>
+    </select>
+    <?php
+}
+
+function aegis_day0_report_time_cb() {
+    $value = get_option('aegis_day0_report_time', '08:00');
+    echo '<input type="time" name="aegis_day0_report_time" value="' . esc_attr($value) . '">';
+    <p class="description">Hora local del servidor para el envío de reportes.</p>
+    <?php
+}
+
+function aegis_day0_report_recipients_cb() {
+    $value = get_option('aegis_day0_report_recipients', get_option('admin_email'));
+    ?>
+    <input type="email" name="aegis_day0_report_recipients" value="<?php echo esc_attr($value); ?>" placeholder="admin@example.com" style="width: 100%; max-width: 400px;">
+    <p class="description">Separa múltiples emails con comas (ej: admin@site.com, security@site.com).</p>
+    <?php
+}
+
+function aegis_day0_wpscan_token_cb() {
+    $value = get_option('aegis_day0_wpscan_token', '');
+    ?>
+    <input type="password" name="aegis_day0_wpscan_token" value="<?php echo esc_attr($value); ?>" style="width: 100%; max-width: 400px;">
+    <p class="description">Obtén tu token gratuito en <a href="https://wpscan.com/" target="_blank" rel="noopener noreferrer">wpscan.com</a>. Necesario para consultar la base de datos de vulnerabilidades conocidas.</p>
     <?php
 }
