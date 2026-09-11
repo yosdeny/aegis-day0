@@ -1,6 +1,1 @@
-```php
-<?php
-// No specific gitignore rules needed for this PHP dashboard file
-// Add general PHP project ignores if needed in the future
-?>
-```
+Nothing needs to be added to .gitignore since only a PHP source file was modified and no build artifacts, dependencies, or temporary files were included in the changes.

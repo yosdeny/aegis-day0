@@ -60,7 +60,7 @@ add_action('admin_menu', 'aegis_day0_admin_menu');
 function aegis_day0_handle_clear_logs() {
     if (isset($_POST['aegis_clear_logs']) && check_admin_referer('aegis_clear_logs_action')) {
         if (current_user_can('manage_options')) {
-            delete_option('aegis_day0_scan_logs');
+            delete_option('aegis_day0_logs');
             wp_redirect(admin_url('admin.php?page=aegis-day0-logs&cleared=1'));
             exit;
         }
