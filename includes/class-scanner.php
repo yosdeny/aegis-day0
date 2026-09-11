@@ -293,18 +293,58 @@ class Aegis_Day0_Scanner {
     private function static_scan($plugin_file) {
         $issues = [];
         $plugin_path = WP_PLUGIN_DIR . '/' . $plugin_file;
-        
+
         // Validate file path to prevent directory traversal
         $real_path = realpath($plugin_path);
         if (!$real_path || strpos($real_path, WP_PLUGIN_DIR) !== 0) {
             return $issues;
         }
+
+        // Escanear todos los archivos PHP del plugin, no solo el archivo principal
+        $php_files = $this->get_all_php_files($real_path);
         
-        if (!file_exists($real_path) || !is_readable($real_path)) {
+        foreach ($php_files as $file_path) {
+            $file_issues = $this->scan_file($file_path);
+            $issues = array_merge($issues, $file_issues);
+        }
+
+        return $issues;
+    }
+
+    /**
+     * Obtener todos los archivos PHP de un directorio recursivamente
+     */
+    private function get_all_php_files($dir) {
+        $files = [];
+        
+        if (!is_dir($dir)) {
+            return $files;
+        }
+
+        $iterator = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS)
+        );
+
+        foreach ($iterator as $file) {
+            if ($file->isFile() && strtolower($file->getExtension()) === 'php') {
+                $files[] = $file->getPathname();
+            }
+        }
+
+        return $files;
+    }
+
+    /**
+     * Escanear un archivo individual en busca de vulnerabilidades
+     */
+    private function scan_file($file_path) {
+        $issues = [];
+
+        if (!file_exists($file_path) || !is_readable($file_path)) {
             return $issues;
         }
 
-        $content = @file_get_contents($real_path);
+        $content = @file_get_contents($file_path);
         if ($content === false) {
             return $issues;
         }
@@ -317,16 +357,26 @@ class Aegis_Day0_Scanner {
                         continue;
                     }
                 }
-                
+
                 $issues[] = [
                     'type'     => $rule['description'],
                     'severity' => $rule['severity'],
-                    'false_positive_risk' => isset($rule['false_positive_risk']) ? $rule['false_positive_risk'] : 'unknown'
+                    'false_positive_risk' => isset($rule['false_positive_risk']) ? $rule['false_positive_risk'] : 'unknown',
+                    'file'     => basename($file_path),
+                    'line'     => $this->get_line_number($content, $matches[0][1])
                 ];
             }
         }
 
         return $issues;
+    }
+
+    /**
+     * Obtener número de línea desde un offset en el contenido
+     */
+    private function get_line_number($content, $offset) {
+        $lines = substr($content, 0, $offset);
+        return substr_count($lines, "\n") + 1;
     }
 
     /**
