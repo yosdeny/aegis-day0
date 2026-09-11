@@ -12,10 +12,17 @@ class Aegis_Day0_Reports {
             return;
         }
 
-        // If no recipients configured, use admin_email by default
+        // Obtener destinatarios configurados
         $recipients = get_option('aegis_day0_report_recipients', '');
+        
+        // Si no hay recipients configurados, usar admin_email con validación
         if (empty($recipients)) {
             $recipients = get_option('admin_email');
+            // Validar que el email de admin sea válido antes de usarlo
+            if (!is_email($recipients)) {
+                error_log('Aegis Day0: Invalid admin_email configured, skipping report');
+                return;
+            }
         }
 
         // Sanitize and validate email addresses

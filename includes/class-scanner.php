@@ -329,18 +329,28 @@ class Aegis_Day0_Scanner {
         return $issues;
     }
 
+    /**
+     * Desactiva automáticamente un plugin si es crítico y tiene vulnerabilidad severa
+     * 
+     * @param string $plugin_file Archivo del plugin
+     * @param string $severity Severidad de la vulnerabilidad
+     */
     private function maybe_disable_plugin($plugin_file, $severity) {
         $auto_disable = get_option('aegis_day0_auto_disable', 0);
         
         // Only auto-disable for Critical severity issues
         if ($auto_disable && $severity === 'Critical') {
-            // Prevent disabling critical WordPress plugins
-            $critical_plugins = [
-                'wordpress-seo/wp-seo.php', 
-                'woocommerce/woocommerce.php',
-                'akismet/akismet.php',
-                'classic-editor/classic-editor.php'
-            ];
+            // Lista de plugins críticos que no deben desactivarse automáticamente
+            // Aplicar filtro para permitir personalización por el sitio
+            $critical_plugins = apply_filters(
+                'aegis_day0_critical_plugins',
+                [
+                    'wordpress-seo/wp-seo.php', 
+                    'woocommerce/woocommerce.php',
+                    'akismet/akismet.php',
+                    'classic-editor/classic-editor.php'
+                ]
+            );
             
             if (in_array($plugin_file, $critical_plugins, true)) {
                 Aegis_Day0_Logger::add_log(

@@ -23,6 +23,7 @@ define('AEGIS_DAY0_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('AEGIS_DAY0_PLUGIN_URL', plugin_dir_url(__FILE__));
 
 // Includes
+require_once AEGIS_DAY0_PLUGIN_DIR . 'includes/config.php';
 require_once AEGIS_DAY0_PLUGIN_DIR . 'includes/class-token-analyzer.php';
 require_once AEGIS_DAY0_PLUGIN_DIR . 'includes/class-scanner.php';
 require_once AEGIS_DAY0_PLUGIN_DIR . 'includes/rules.php';
@@ -32,12 +33,51 @@ require_once AEGIS_DAY0_PLUGIN_DIR . 'includes/logger.php';
 require_once AEGIS_DAY0_PLUGIN_DIR . 'includes/reports.php';
 require_once AEGIS_DAY0_PLUGIN_DIR . 'admin/dashboard.php';
 
-// Inicialización
+// Enqueue admin styles
+function aegis_day0_enqueue_admin_styles() {
+    wp_enqueue_style(
+        'aegis-day0-css',
+        AEGIS_DAY0_PLUGIN_URL . 'admin/css/dashboard.css',
+        [],
+        AEGIS_DAY0_VERSION
+    );
+}
+add_action('admin_enqueue_scripts', 'aegis_day0_enqueue_admin_styles');
+
+// Inicialización - movido a cron para evitar ejecución en cada carga de página
 function aegis_day0_init() {
     $scanner = new Aegis_Day0_Scanner();
     $scanner->run_checks();
 }
-add_action('admin_init', 'aegis_day0_init');
+
+// Programar escaneo periódico en lugar de ejecutar en cada carga admin
+function aegis_day0_schedule_scan() {
+    if (!current_user_can('manage_options')) {
+        return;
+    }
+    
+    if (!wp_next_scheduled('aegis_day0_run_scan')) {
+        wp_schedule_event(time(), 'hourly', 'aegis_day0_run_scan');
+    }
+}
+add_action('admin_init', 'aegis_day0_schedule_scan');
+
+// Ejecutar escaneo vía cron programado
+add_action('aegis_day0_run_scan', 'aegis_day0_init');
+
+// Acción manual para forzar escaneo inmediato (desde dashboard)
+function aegis_day0_force_scan() {
+    if (!current_user_can('manage_options')) {
+        return false;
+    }
+    
+    // Clear the scan transient to allow immediate re-scan
+    delete_transient('aegis_day0_last_scan');
+    
+    aegis_day0_init();
+    
+    return true;
+}
 
 // Settings
 function aegis_day0_register_settings() {

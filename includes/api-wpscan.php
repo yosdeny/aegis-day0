@@ -3,6 +3,12 @@ class Aegis_Day0_WPScan {
 
     private static $api_url = 'https://wpscan.com/api/v3/plugins/';
 
+    /**
+     * Verifica vulnerabilidades de un plugin usando WPScan API
+     * 
+     * @param string $plugin_name Nombre del plugin a verificar
+     * @return array Lista de vulnerabilidades encontradas
+     */
     public static function check_plugin($plugin_name) {
         $issues = [];
 
@@ -14,11 +20,16 @@ class Aegis_Day0_WPScan {
             return $issues;
         }
 
-        $url = self::$api_url . urlencode($plugin_name) . '?api_token=' . urlencode($api_token);
+        // Usar header Authorization en lugar de parámetro URL para mayor seguridad
+        $url = self::$api_url . urlencode($plugin_name) . '/';
         $response = wp_remote_get($url, [
             'timeout' => 15,
             'user-agent' => 'Aegis-Day0/' . AEGIS_DAY0_VERSION,
-            'sslverify' => true
+            'sslverify' => true,
+            'headers' => [
+                'Authorization' => 'Token ' . $api_token,
+                'Accept' => 'application/json'
+            ]
         ]);
 
         if (is_wp_error($response)) {
@@ -45,7 +56,14 @@ class Aegis_Day0_WPScan {
 
         if (!empty($data['vulnerabilities']) && is_array($data['vulnerabilities'])) {
             foreach ($data['vulnerabilities'] as $vuln) {
+                // Validación estricta de tipos para prevenir XSS si WPScan es comprometido
                 if (!isset($vuln['title']) || !isset($vuln['severity'])) {
+                    continue;
+                }
+                
+                // Validar que los campos sean del tipo correcto
+                if (!is_string($vuln['title']) || !is_string($vuln['severity'])) {
+                    error_log('Aegis Day0 WPScan API: Invalid data types in vulnerability response');
                     continue;
                 }
                 
