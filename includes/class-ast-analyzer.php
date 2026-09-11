@@ -892,6 +892,24 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
             return;
         }
         
+        // VERIFICACIÓN ESPECIAL: Si es $wpdb->query(), verificar si el primer argumento es una llamada a $wpdb->prepare()
+        if ($method_str === 'query' && !empty($node->args)) {
+            $first_arg = $node->args[0];
+            if ($first_arg instanceof Node\Arg && $first_arg->value instanceof Node\Expr\MethodCall) {
+                $inner_method = $first_arg->value->name;
+                $inner_var = $first_arg->value->var;
+                
+                // Verificar si es $wpdb->prepare(...)
+                if ($inner_method instanceof Node\Identifier && 
+                    $inner_method->toString() === 'prepare' &&
+                    $inner_var instanceof Node\Expr\Variable && 
+                    $inner_var->name === 'wpdb') {
+                    // La consulta está protegida con prepare(), NO generar alerta
+                    return;
+                }
+            }
+        }
+        
         // Obtener información del método peligroso
         $method_info = $this->analyzer->get_method_info($method_str, 'wpdb');
         
@@ -957,7 +975,7 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
             $false_positive_risk = 'high';
         }
         
-        // Generar alerta
+        // Generar alerta solo si no está sanitizado o usa input de usuario
         if ($adjusted_severity !== 'low' || $uses_user_input) {
             $description = sprintf(
                 __('Método %s::%s() detectado. %s', 'aegis-day0'),
