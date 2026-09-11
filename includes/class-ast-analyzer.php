@@ -763,10 +763,10 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
                 $this->security_validation_count['domain_validation']++;
             }
             
-            // Detectar validación de método HTTP
+            // Detectar validación de método HTTP - patrones ampliados
             if (strpos($func_name, 'request_method') !== false || 
                 strpos($func_name, 'http_method') !== false ||
-                in_array($func_name, ['check_request_method'])) {
+                in_array($func_name, ['check_request_method', 'validate_request_method'])) {
                 $this->security_validation_count['method_validation']++;
             }
             
@@ -775,8 +775,8 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
                 $this->security_validation_count['referer_check']++;
             }
             
-            // Detectar sanitización de input
-            if (in_array(strtolower($func_name), ['sanitize_text_field', 'sanitize_email', 'sanitize_key', 'absint', 'sanitize_textarea_field'])) {
+            // Detectar sanitización de input - lista ampliada
+            if (in_array(strtolower($func_name), ['sanitize_text_field', 'sanitize_email', 'sanitize_key', 'absint', 'sanitize_textarea_field', 'sanitize_file_name', 'sanitize_title', 'wp_kses_data'])) {
                 $this->security_validation_count['input_sanitization']++;
             }
         }
@@ -814,6 +814,34 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
                         strpos($left->dim->value, 'REQUEST_METHOD') !== false) {
                         $this->security_validation_count['method_validation']++;
                     }
+                }
+            }
+            
+            // Detectar patrones de string en comparación de REQUEST_METHOD
+            // Ej: $_SERVER['REQUEST_METHOD'] === 'POST'
+            if ($condition instanceof Node\Expr\BinaryOp\Identical || 
+                $condition instanceof Node\Expr\BinaryOp\Equal) {
+                $left = $condition->left;
+                $right = $condition->right;
+                
+                // Caso: $_SERVER['REQUEST_METHOD'] === 'POST'
+                if ($left instanceof Node\Expr\ArrayDimFetch && 
+                    $left->var instanceof Node\Expr\Variable && 
+                    is_string($left->var->name) && 
+                    $left->var->name === '_SERVER' &&
+                    $left->dim instanceof Node\Scalar\String_ &&
+                    $left->dim->value === 'REQUEST_METHOD') {
+                    $this->security_validation_count['method_validation']++;
+                }
+                
+                // Caso inverso: 'POST' === $_SERVER['REQUEST_METHOD']
+                if ($right instanceof Node\Expr\ArrayDimFetch && 
+                    $right->var instanceof Node\Expr\Variable && 
+                    is_string($right->var->name) && 
+                    $right->var->name === '_SERVER' &&
+                    $right->dim instanceof Node\Scalar\String_ &&
+                    $right->dim->value === 'REQUEST_METHOD') {
+                    $this->security_validation_count['method_validation']++;
                 }
             }
         }
@@ -960,8 +988,8 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
         // Solo alertar si es verdaderamente dinámico y peligroso
         if ($uses_dynamic) {
             // Bajar severidad para rutas dinámicas sin input directo de usuario
-            $severity = $uses_user_input ? 'critical' : 'medium';
-            $fp_risk = $uses_user_input ? 'low' : 'alto'; // Mejorar etiqueta para UX
+            $severity = $uses_user_input ? 'critical' : 'low';
+            $fp_risk = $uses_user_input ? 'low' : 'high';
 
             $this->analyzer->add_alert([
                 'type' => 'file_inclusion',
@@ -975,7 +1003,7 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
                     $func_name,
                     $uses_user_input 
                         ? __('La ruta incluye input de usuario - RIESGO CRÍTICO de LFI/RFI.', 'aegis-day0')
-                        : __('Verificar que la ruta no dependa de input de usuario.', 'aegis-day0')
+                        : __('Ruta construida dinámicamente pero sin input directo de usuario. Verificar que use constantes seguras.', 'aegis-day0')
                 ),
                 'uses_user_input' => $uses_user_input,
                 'recommendation' => __('Usar rutas absolutas con constantes como __DIR__ o plugin_dir_path().', 'aegis-day0')
@@ -1008,7 +1036,7 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
             // Constantes personalizadas que siguen patrones seguros
             // Ej: AEGIS_DAY0_PLUGIN_DIR, YGB_E2_PLUGIN_DIR, MYPLUGIN_PATH, etc.
             // Patrón flexible: debe contener palabras clave como PLUGIN, THEME, TEMPLATE, CONTENT, MODULE + DIR/PATH
-            if (preg_match($this->analyzer->safe_plugin_constants_pattern ?? '/(?:PLUGIN|THEME|TEMPLATE|STYLE|CONTENT|MODULE|COMPONENT|APP|BASE|LIB|INCLUDE|VENDOR|SRC)[_\.].*?(?:DIR|PATH)|(?:DIR|PATH)[_\.].*?(?:PLUGIN|THEME|TEMPLATE|STYLE|CONTENT|MODULE|COMPONENT|APP|BASE|LIB|INCLUDE|VENDOR|SRC)|^[A-Z][A-Z0-9_]*?(?:DIR|PATH)$/i', $name)) {
+            if (preg_match($this->analyzer->safe_plugin_constants_pattern ?? '/(?:PLUGIN|THEME|TEMPLATE|STYLE|CONTENT|MODULE|COMPONENT|APP|BASE|LIB|INCLUDE|VENDOR|SRC|YGB|AEGIS)[_\.].*?(?:DIR|PATH)|(?:DIR|PATH)[_\.].*?(?:PLUGIN|THEME|TEMPLATE|STYLE|CONTENT|MODULE|COMPONENT|APP|BASE|LIB|INCLUDE|VENDOR|SRC|YGB|AEGIS)|^[A-Z][A-Z0-9_]*?(?:DIR|PATH)$/i', $name)) {
                 return true;
             }
             return false;
@@ -1090,7 +1118,7 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
             }
             // Constantes personalizadas que siguen patrones seguros
             // Ej: AEGIS_DAY0_PLUGIN_DIR, YGB_E2_PLUGIN_DIR, MYPLUGIN_PATH, etc.
-            if (preg_match($this->analyzer->safe_plugin_constants_pattern ?? '/(?:PLUGIN|THEME|TEMPLATE|STYLE|CONTENT|MODULE|COMPONENT|APP|BASE|LIB|INCLUDE|VENDOR|SRC)[_\.].*?(?:DIR|PATH)|(?:DIR|PATH)[_\.].*?(?:PLUGIN|THEME|TEMPLATE|STYLE|CONTENT|MODULE|COMPONENT|APP|BASE|LIB|INCLUDE|VENDOR|SRC)|^[A-Z][A-Z0-9_]*?(?:DIR|PATH)$/i', $name)) {
+            if (preg_match($this->analyzer->safe_plugin_constants_pattern ?? '/(?:PLUGIN|THEME|TEMPLATE|STYLE|CONTENT|MODULE|COMPONENT|APP|BASE|LIB|INCLUDE|VENDOR|SRC|YGB|AEGIS)[_\.].*?(?:DIR|PATH)|(?:DIR|PATH)[_\.].*?(?:PLUGIN|THEME|TEMPLATE|STYLE|CONTENT|MODULE|COMPONENT|APP|BASE|LIB|INCLUDE|VENDOR|SRC|YGB|AEGIS)|^[A-Z][A-Z0-9_]*?(?:DIR|PATH)$/i', $name)) {
                 return true;
             }
             return false;
@@ -1100,8 +1128,8 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
         if ($node instanceof Node\Expr\FuncCall) {
             if ($node->name instanceof Node\Name) {
                 $funcName = $node->name->toString();
-                $safeFunctions = ['plugin_dir_path', 'plugin_dir_url', 'dirname', 'get_template_directory', 'get_stylesheet_directory'];
-                if (in_array($funcName, $safeFunctions)) {
+                $safeFunctions = ['plugin_dir_path', 'plugin_dir_url', 'dirname', 'get_template_directory', 'get_stylesheet_directory', 'get_home_path', 'trailingslashit', 'untrailingslashit'];
+                if (in_array($funcName, $safeFunctions, true)) {
                     return true;
                 }
             }
@@ -1117,7 +1145,7 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
         // Se verifica por nombre común de constantes de plugins
         if ($node instanceof Node\Expr\Variable && is_string($node->name)) {
             // Variables comunes de directorio de plugin
-            $safeVarPatterns = ['/plugin.*dir/i', '/.*_path/i', '/.*_dir/i'];
+            $safeVarPatterns = ['/plugin.*dir/i', '/.*_path/i', '/.*_dir/i', '/includes.*path/i', '/includes.*dir/i'];
             $varName = $node->name;
             foreach ($safeVarPatterns as $pattern) {
                 if (preg_match($pattern, $varName)) {
@@ -1322,6 +1350,11 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
      * Verifica si una expresión de concatenación contiene input de usuario
      */
     private function containsUserInput(Node $node) {
+        // Si la expresión es una base segura, no considerar como input peligroso
+        if ($this->isSafeBase($node)) {
+            return false;
+        }
+        
         if ($node instanceof Node\Expr\Variable) {
             $var_name = $this->analyzer->get_variable_name($node);
             return $var_name && in_array($var_name, $this->user_input_vars, true);
@@ -1329,6 +1362,11 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
         
         if ($node instanceof Node\Expr\BinaryOp\Concat) {
             return $this->containsUserInput($node->left) || $this->containsUserInput($node->right);
+        }
+        
+        // Verificar acceso a superglobals directamente
+        if ($this->analyzer->is_superglobal_access($node)) {
+            return true;
         }
         
         return false;
