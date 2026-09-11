@@ -834,8 +834,8 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
             }
             // Constantes personalizadas que siguen patrones seguros
             // Ej: AEGIS_DAY0_PLUGIN_DIR, YGB_E2_PLUGIN_DIR, MYPLUGIN_PATH, etc.
-            // Patrón flexible: debe contener palabras clave como PLUGIN, THEME, TEMPLATE, CONTENT, MODULE + DIR/PATH
-            if (preg_match('/(?:PLUGIN|THEME|TEMPLATE|STYLE|CONTENT|MODULE|COMPONENT|APP|BASE|LIB|INCLUDE|VENDOR|SRC)[_\.].*?(?:DIR|PATH)|(?:DIR|PATH)[_\.].*?(?:PLUGIN|THEME|TEMPLATE|STYLE|CONTENT|MODULE|COMPONENT|APP|BASE|LIB|INCLUDE|VENDOR|SRC)|^[A-Z][A-Z0-9_]*?(?:DIR|PATH)$/i', $name)) {
+            // Patrón flexible: cualquier constante en MAYUSCULAS que termine en _DIR o _PATH
+            if (preg_match('/^[A-Z][A-Z0-9_]*(?:_DIR|_PATH)$/i', $name)) {
                 return true;
             }
             return false;
@@ -917,7 +917,8 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
             }
             // Constantes personalizadas que siguen patrones seguros
             // Ej: AEGIS_DAY0_PLUGIN_DIR, YGB_E2_PLUGIN_DIR, MYPLUGIN_PATH, etc.
-            if (preg_match('/(?:PLUGIN|THEME|TEMPLATE|STYLE|CONTENT|MODULE|COMPONENT|APP|BASE|LIB|INCLUDE|VENDOR|SRC)[_\.].*?(?:DIR|PATH)|(?:DIR|PATH)[_\.].*?(?:PLUGIN|THEME|TEMPLATE|STYLE|CONTENT|MODULE|COMPONENT|APP|BASE|LIB|INCLUDE|VENDOR|SRC)|^[A-Z][A-Z0-9_]*?(?:DIR|PATH)$/i', $name)) {
+            // Patrón flexible: cualquier constante en MAYUSCULAS que termine en _DIR o _PATH
+            if (preg_match('/^[A-Z][A-Z0-9_]*(?:_DIR|_PATH)$/i', $name)) {
                 return true;
             }
             return false;
