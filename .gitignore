@@ -1,1 +1,38 @@
-Nothing should be ignored based on the provided file changes. The only modified file is a PHP source file (`includes/class-ast-analyzer.php`), which is a legitimate source code file that should not be ignored. Since there are no build artifacts, dependencies, temporary files, or other ignorable items in the changes, no .gitignore rules are needed.
+```
+# PHP related
+*.php~
+
+# Temporary and backup files
+*.tmp
+*.bak
+*.backup
+*~
+.#*
+
+# Logs
+*.log
+
+# Environment specific
+.env
+.env.local
+.env.*
+
+# Dependencies
+vendor/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Test files (if they follow common patterns)
+*.test.php
+*_test.php
+test_*.php
+tests/
+```
