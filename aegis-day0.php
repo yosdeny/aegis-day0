@@ -126,6 +126,41 @@ function aegis_day0_register_settings() {
 }
 add_action('admin_init', 'aegis_day0_register_settings');
 
+// Callback functions for settings fields
+function aegis_day0_auto_deactivate_cb() {
+    $value = get_option('aegis_day0_auto_disable', 0);
+    echo '<label><input type="checkbox" name="aegis_day0_auto_disable" value="1" ' . checked(1, $value, false) . ' /> Auto Desactivar plugins críticos</label>';
+    echo '<p class="description">Si se marca, los plugins considerados "críticos" se desactivarán solos si se detecta una vulnerabilidad de severidad Critical.</p>';
+}
+
+function aegis_day0_report_frequency_cb() {
+    $value = get_option('aegis_day0_report_frequency', 'weekly');
+    ?>
+    <select name="aegis_day0_report_frequency">
+        <option value="daily" <?php selected($value, 'daily'); ?>>Diario</option>
+        <option value="weekly" <?php selected($value, 'weekly'); ?>>Semanal</option>
+        <option value="monthly" <?php selected($value, 'monthly'); ?>>Mensual</option>
+    </select>
+    <?php
+}
+
+function aegis_day0_report_time_cb() {
+    $value = get_option('aegis_day0_report_time', '08:00');
+    echo '<input type="time" name="aegis_day0_report_time" value="' . esc_attr($value) . '" />';
+}
+
+function aegis_day0_report_recipients_cb() {
+    $value = get_option('aegis_day0_report_recipients', '');
+    echo '<input type="text" name="aegis_day0_report_recipients" value="' . esc_attr($value) . '" class="regular-text" placeholder="email1@ejemplo.com, email2@ejemplo.com" />';
+    echo '<p class="description">Separa múltiples emails con comas.</p>';
+}
+
+function aegis_day0_wpscan_token_cb() {
+    $value = get_option('aegis_day0_wpscan_token', '');
+    echo '<input type="password" name="aegis_day0_wpscan_token" value="' . esc_attr($value) . '" class="regular-text" />';
+    echo '<p class="description">Obtén tu token gratuito en <a href="https://wpscan.com/" target="_blank">WPScan.com</a>.</p>';
+}
+
 // Cron programado
 function aegis_day0_schedule_reports() {
     if (!current_user_can('manage_options')) {
