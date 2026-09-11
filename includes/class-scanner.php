@@ -43,7 +43,12 @@ class Aegis_Day0_Scanner {
         
         $plugins = get_plugins();
         $alerts = [];
-        $processed_alerts = []; // Track unique alerts to prevent duplicates
+        $processed_alerts = []; // Track unique alerts to prevent duplicates within same scan
+        
+        // Get previously notified alerts to avoid sending duplicate notifications
+        $previously_notified = get_option('aegis_day0_notified_alerts', []);
+        $currently_detected = []; // Track what's currently detected
+        $new_notifications = []; // Track new alerts to notify
 
         foreach ($plugins as $plugin_file => $plugin_data) {
             $plugin_name = sanitize_text_field($plugin_data['Name']);
@@ -65,6 +70,9 @@ class Aegis_Day0_Scanner {
                         'false_positive_risk' => isset($issue['false_positive_risk']) ? $issue['false_positive_risk'] : 'unknown'
                     ];
                     
+                    // Track this detection
+                    $currently_detected[$alert_key] = true;
+                    
                     Aegis_Day0_Logger::add_log(
                         $plugin_name, 
                         $issue['type'], 
@@ -73,9 +81,15 @@ class Aegis_Day0_Scanner {
                         'Detectado'
                     );
                     
-                    // Only send notification for non-low severity issues
-                    if ($issue['severity'] !== 'Low') {
+                    // Only send notification for non-low severity issues AND if not previously notified
+                    if ($issue['severity'] !== 'Low' && !isset($previously_notified[$alert_key])) {
                         Aegis_Day0_Notify::alert_admin($plugin_name, $issue['type'], $issue['severity']);
+                        $new_notifications[$alert_key] = [
+                            'plugin' => $plugin_name,
+                            'type' => $issue['type'],
+                            'severity' => $issue['severity'],
+                            'time' => current_time('mysql')
+                        ];
                     }
                     
                     // Only auto-disable for Critical severity with low false positive risk
@@ -106,6 +120,9 @@ class Aegis_Day0_Scanner {
                             'line' => isset($issue['line']) ? $issue['line'] : 0
                         ];
                         
+                        // Track this detection
+                        $currently_detected[$alert_key] = true;
+                        
                         Aegis_Day0_Logger::add_log(
                             $plugin_name, 
                             $issue['type'], 
@@ -114,9 +131,15 @@ class Aegis_Day0_Scanner {
                             sprintf('Línea %d: %s', $issue['line'], $issue['function'])
                         );
                         
-                        // Only send notification for non-low severity issues
-                        if ($issue['severity'] !== 'Low') {
+                        // Only send notification for non-low severity issues AND if not previously notified
+                        if ($issue['severity'] !== 'Low' && !isset($previously_notified[$alert_key])) {
                             Aegis_Day0_Notify::alert_admin($plugin_name, $issue['type'], $issue['severity']);
+                            $new_notifications[$alert_key] = [
+                                'plugin' => $plugin_name,
+                                'type' => $issue['type'],
+                                'severity' => $issue['severity'],
+                                'time' => current_time('mysql')
+                            ];
                         }
                         
                         // Auto-disable solo para críticos con bajo riesgo de falso positivo
@@ -148,6 +171,9 @@ class Aegis_Day0_Scanner {
                             'line' => isset($issue['line']) ? $issue['line'] : 0
                         ];
 
+                        // Track this detection
+                        $currently_detected[$alert_key] = true;
+
                         Aegis_Day0_Logger::add_log(
                             $plugin_name,
                             $issue['type'],
@@ -156,9 +182,15 @@ class Aegis_Day0_Scanner {
                             sprintf('Línea %d: %s - %s', $issue['line'], $issue['function'], $issue['description'])
                         );
 
-                        // Only send notification for non-low severity issues
-                        if ($issue['severity'] !== 'Low') {
+                        // Only send notification for non-low severity issues AND if not previously notified
+                        if ($issue['severity'] !== 'Low' && !isset($previously_notified[$alert_key])) {
                             Aegis_Day0_Notify::alert_admin($plugin_name, $issue['type'], $issue['severity']);
+                            $new_notifications[$alert_key] = [
+                                'plugin' => $plugin_name,
+                                'type' => $issue['type'],
+                                'severity' => $issue['severity'],
+                                'time' => current_time('mysql')
+                            ];
                         }
 
                         // Auto-disable solo para críticos con bajo riesgo de falso positivo
@@ -187,6 +219,9 @@ class Aegis_Day0_Scanner {
                         'source'   => 'WPScan'
                     ];
                     
+                    // Track this detection
+                    $currently_detected[$alert_key] = true;
+                    
                     Aegis_Day0_Logger::add_log(
                         $plugin_name, 
                         $issue['type'], 
@@ -195,13 +230,32 @@ class Aegis_Day0_Scanner {
                         'Detectado'
                     );
                     
-                    Aegis_Day0_Notify::alert_admin($plugin_name, $issue['type'], $issue['severity']);
+                    // Only send notification if not previously notified
+                    if (!isset($previously_notified[$alert_key])) {
+                        Aegis_Day0_Notify::alert_admin($plugin_name, $issue['type'], $issue['severity']);
+                        $new_notifications[$alert_key] = [
+                            'plugin' => $plugin_name,
+                            'type' => $issue['type'],
+                            'severity' => $issue['severity'],
+                            'time' => current_time('mysql')
+                        ];
+                    }
                     $this->maybe_disable_plugin($plugin_file, $issue['severity']);
                 }
             }
         }
 
         update_option('aegis_day0_alerts', $alerts);
+        
+        // Merge previous notifications with currently detected ones to maintain state
+        // Only keep notifications for vulnerabilities that are still present
+        $updated_notifications = array_intersect_key($previously_notified, $currently_detected);
+        
+        // Add new notifications
+        $final_notifications = array_merge($updated_notifications, $new_notifications);
+        
+        // Save the updated notification state
+        update_option('aegis_day0_notified_alerts', $final_notifications);
     }
 
     /**

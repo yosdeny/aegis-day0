@@ -201,6 +201,7 @@ function aegis_day0_activate() {
     add_option('aegis_day0_wpscan_token', '');
     add_option('aegis_day0_alerts', []);
     add_option('aegis_day0_logs', []);
+    add_option('aegis_day0_notified_alerts', []);
     
     // Schedule initial report
     aegis_day0_schedule_reports();
