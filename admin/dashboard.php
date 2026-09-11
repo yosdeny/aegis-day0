@@ -257,14 +257,6 @@ function aegis_day0_config_page() {
 // --- Callbacks de los campos de configuración ---
 // Las funciones callback de configuración están definidas en aegis-day0.php
 
-function aegis_day0_wpscan_token_cb() {
-    $value = get_option('aegis_day0_wpscan_token', '');
-    ?>
-    <input type="password" name="aegis_day0_wpscan_token" value="<?php echo esc_attr($value); ?>" style="width: 100%; max-width: 400px;">
-    <p class="description">Obtén tu token gratuito en <a href="https://wpscan.com/" target="_blank" rel="noopener noreferrer">wpscan.com</a>. Necesario para consultar la base de datos de vulnerabilidades conocidas.</p>
-    <?php
-}
-
 /**
  * Maneja la exportación de logs
  */

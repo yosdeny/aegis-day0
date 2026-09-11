@@ -1,1 +1,6 @@
-Nothing should be ignored based on the provided file changes. The only modified file is 'admin/dashboard.php', which is a source code file and should not be added to .gitignore.
+```php
+<?php
+// No specific gitignore rules needed for this PHP dashboard file
+// Add general PHP project ignores if needed in the future
+?>
+```
