@@ -5,7 +5,7 @@ Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 8.0
 Tested PHP: 8.2
-Stable tag: 0.2
+Stable tag: 0.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -50,6 +50,12 @@ Los resultados del análisis estático deben ser verificados manualmente. El plu
 
 == Changelog ==
 
+= 0.3 =
+* Mejora en detección de falsos positivos: El analizador AST ahora reconoce automáticamente patrones seguros de inclusión de archivos usando constantes estándar de WordPress (__DIR__, __FILE__, ABSPATH, WP_PLUGIN_DIR, etc.) y constantes personalizadas que siguen convenciones de nomenclatura seguras.
+* Reducción significativa de alertas innecesarias por "inclusión dinámica" cuando la ruta está construida con constantes seguras.
+* Corrección de estilos CSS en el dashboard: tabla de vulnerabilidades ahora se muestra correctamente estructurada con columnas alineadas y diseño responsive.
+* Optimización del sistema de reporte para identificar con mayor precisión vulnerabilidades reales.
+
 = 0.2 =
 * Mejoras de seguridad: implementación de nonces CSRF, escape de salida y sanitización de entradas.
 * Token de API ahora se almacena de forma segura en las opciones de WordPress.
@@ -63,6 +69,9 @@ Los resultados del análisis estático deben ser verificados manualmente. El plu
 * Sistema de logs y exportación.
 
 == Upgrade Notice ==
+
+= 0.3 =
+Mejora importante en la precisión del escáner: reducción de falsos positivos en detección de inclusiones dinámicas y corrección de estilos en el dashboard.
 
 = 0.2 =
 Actualización crítica de seguridad. Se recomienda actualizar inmediatamente.
