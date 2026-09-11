@@ -69,17 +69,24 @@ function aegis_day0_handle_clear_logs() {
 add_action('admin_init', 'aegis_day0_handle_clear_logs');
 
 /**
- * Renderiza la página del Dashboard
+ * Maneja la acción de escaneo forzado desde el dashboard
  */
-function aegis_day0_dashboard_page() {
-    // Forzar escaneo si se solicita
+function aegis_day0_handle_force_scan() {
     if (isset($_POST['force_scan']) && check_admin_referer('aegis_force_scan_action')) {
-        if (function_exists('aegis_day0_run_scan')) {
-            aegis_day0_run_scan();
-            echo '<div class="notice notice-success is-dismissible"><p>✅ Escaneo forzado completado con éxito.</p></div>';
+        if (current_user_can('manage_options')) {
+            delete_transient('aegis_day0_last_scan');
+            $scanner = new Aegis_Day0_Scanner();
+            $scanner->run_checks();
+            echo '<div class="notice notice-success is-dismissible"><p>Escaneo forzado completado con exito.</p></div>';
         }
     }
+}
+add_action('admin_init', 'aegis_day0_handle_force_scan');
 
+/**
+ * Renderiza la pagina del Dashboard
+ */
+function aegis_day0_dashboard_page() {
     $alerts = get_option('aegis_day0_alerts', []);
     ?>
     <div class="wrap">
