@@ -158,6 +158,25 @@ class Aegis_AST_Analyzer {
     ];
 
     /**
+     * Patrones adicionales de seguridad para endpoints AJAX
+     */
+    private $ajax_security_patterns = [
+        // Validación de método HTTP
+        'check_request_method' => ['$_SERVER[REQUEST_METHOD]', '$_SERVER["REQUEST_METHOD"]'],
+        // Verificación de referer/origen
+        'referer_check' => ['wp_get_referer', 'check_admin_referer', 'wp_verify_referer'],
+        // Validación de IP
+        'ip_validation' => ['get_client_ip', 'REMOTE_ADDR'],
+        // Sanitización específica
+        'input_sanitization' => ['sanitize_text_field', 'sanitize_email', 'sanitize_key', 'absint'],
+    ];
+
+    /**
+     * Constantes seguras comunes de plugins
+     */
+    private $safe_plugin_constants_pattern = '/(?:PLUGIN|THEME|TEMPLATE|STYLE|CONTENT|MODULE|COMPONENT|APP|BASE|LIB|INCLUDE|VENDOR|SRC|YGB|AEGIS)[_\.].*?(?:DIR|PATH)|(?:DIR|PATH)[_\.].*?(?:PLUGIN|THEME|TEMPLATE|STYLE|CONTENT|MODULE|COMPONENT|APP|BASE|LIB|INCLUDE|VENDOR|SRC|YGB|AEGIS)|^[A-Z][A-Z0-9_]*?(?:DIR|PATH)$/i';
+
+    /**
      * Superglobals que indican input de usuario
      */
     private $superglobals = [
@@ -588,6 +607,9 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
         'rate_limiting' => 0,
         'domain_validation' => 0,
         'output_sanitization' => 0,
+        'method_validation' => 0,
+        'referer_check' => 0,
+        'input_sanitization' => 0,
     ];
 
     /**
@@ -612,6 +634,9 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
             'rate_limiting' => 0,
             'domain_validation' => 0,
             'output_sanitization' => 0,
+            'method_validation' => 0,
+            'referer_check' => 0,
+            'input_sanitization' => 0,
         ];
         return null;
     }
@@ -737,6 +762,23 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
                 strpos($func_name, 'domain') !== false || strpos($func_name, 'host') !== false) {
                 $this->security_validation_count['domain_validation']++;
             }
+            
+            // Detectar validación de método HTTP
+            if (strpos($func_name, 'request_method') !== false || 
+                strpos($func_name, 'http_method') !== false ||
+                in_array($func_name, ['check_request_method'])) {
+                $this->security_validation_count['method_validation']++;
+            }
+            
+            // Detectar verificación de referer
+            if (in_array(strtolower($func_name), ['wp_get_referer', 'check_admin_referer', 'wp_verify_referer'])) {
+                $this->security_validation_count['referer_check']++;
+            }
+            
+            // Detectar sanitización de input
+            if (in_array(strtolower($func_name), ['sanitize_text_field', 'sanitize_email', 'sanitize_key', 'absint', 'sanitize_textarea_field'])) {
+                $this->security_validation_count['input_sanitization']++;
+            }
         }
         
         // Detectar validaciones condicionales en expresiones
@@ -744,8 +786,34 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
             $condition = $node->cond;
             if ($condition instanceof Node\Expr\FuncCall && $condition->name instanceof Node\Name) {
                 $func_name = $condition->name->toString();
+                
                 if ($this->analyzer->is_nonce_validation_function($func_name)) {
                     $this->security_validation_count['nonce_checks']++;
+                }
+                
+                // Validaciones en condicionales también cuentan
+                if (in_array(strtolower($func_name), ['wp_get_referer', 'check_admin_referer'])) {
+                    $this->security_validation_count['referer_check']++;
+                }
+                
+                // Verificación de método HTTP en condicional
+                if (strpos($func_name, 'request_method') !== false) {
+                    $this->security_validation_count['method_validation']++;
+                }
+            }
+            
+            // Detectar comparación de REQUEST_METHOD en el condicional
+            if ($condition instanceof Node\Expr\BinaryOp\Identical || 
+                $condition instanceof Node\Expr\BinaryOp\Equal) {
+                $left = $condition->left;
+                if ($left instanceof Node\Expr\ArrayDimFetch && 
+                    $left->var instanceof Node\Expr\Variable && 
+                    is_string($left->var->name) && 
+                    $left->var->name === '_SERVER') {
+                    if ($left->dim instanceof Node\Scalar\String_ && 
+                        strpos($left->dim->value, 'REQUEST_METHOD') !== false) {
+                        $this->security_validation_count['method_validation']++;
+                    }
                 }
             }
         }
@@ -940,7 +1008,7 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
             // Constantes personalizadas que siguen patrones seguros
             // Ej: AEGIS_DAY0_PLUGIN_DIR, YGB_E2_PLUGIN_DIR, MYPLUGIN_PATH, etc.
             // Patrón flexible: debe contener palabras clave como PLUGIN, THEME, TEMPLATE, CONTENT, MODULE + DIR/PATH
-            if (preg_match('/(?:PLUGIN|THEME|TEMPLATE|STYLE|CONTENT|MODULE|COMPONENT|APP|BASE|LIB|INCLUDE|VENDOR|SRC)[_\.].*?(?:DIR|PATH)|(?:DIR|PATH)[_\.].*?(?:PLUGIN|THEME|TEMPLATE|STYLE|CONTENT|MODULE|COMPONENT|APP|BASE|LIB|INCLUDE|VENDOR|SRC)|^[A-Z][A-Z0-9_]*?(?:DIR|PATH)$/i', $name)) {
+            if (preg_match($this->analyzer->safe_plugin_constants_pattern ?? '/(?:PLUGIN|THEME|TEMPLATE|STYLE|CONTENT|MODULE|COMPONENT|APP|BASE|LIB|INCLUDE|VENDOR|SRC)[_\.].*?(?:DIR|PATH)|(?:DIR|PATH)[_\.].*?(?:PLUGIN|THEME|TEMPLATE|STYLE|CONTENT|MODULE|COMPONENT|APP|BASE|LIB|INCLUDE|VENDOR|SRC)|^[A-Z][A-Z0-9_]*?(?:DIR|PATH)$/i', $name)) {
                 return true;
             }
             return false;
@@ -1022,7 +1090,7 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
             }
             // Constantes personalizadas que siguen patrones seguros
             // Ej: AEGIS_DAY0_PLUGIN_DIR, YGB_E2_PLUGIN_DIR, MYPLUGIN_PATH, etc.
-            if (preg_match('/(?:PLUGIN|THEME|TEMPLATE|STYLE|CONTENT|MODULE|COMPONENT|APP|BASE|LIB|INCLUDE|VENDOR|SRC)[_\.].*?(?:DIR|PATH)|(?:DIR|PATH)[_\.].*?(?:PLUGIN|THEME|TEMPLATE|STYLE|CONTENT|MODULE|COMPONENT|APP|BASE|LIB|INCLUDE|VENDOR|SRC)|^[A-Z][A-Z0-9_]*?(?:DIR|PATH)$/i', $name)) {
+            if (preg_match($this->analyzer->safe_plugin_constants_pattern ?? '/(?:PLUGIN|THEME|TEMPLATE|STYLE|CONTENT|MODULE|COMPONENT|APP|BASE|LIB|INCLUDE|VENDOR|SRC)[_\.].*?(?:DIR|PATH)|(?:DIR|PATH)[_\.].*?(?:PLUGIN|THEME|TEMPLATE|STYLE|CONTENT|MODULE|COMPONENT|APP|BASE|LIB|INCLUDE|VENDOR|SRC)|^[A-Z][A-Z0-9_]*?(?:DIR|PATH)$/i', $name)) {
                 return true;
             }
             return false;
@@ -1299,25 +1367,52 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
             $has_rate_limiting = $this->security_validation_count['rate_limiting'] > 0;
             $has_output_sanitization = $this->security_validation_count['output_sanitization'] > 0;
             $has_domain_validation = $this->security_validation_count['domain_validation'] > 0;
+            $has_method_validation = $this->security_validation_count['method_validation'] > 0;
+            $has_referer_check = $this->security_validation_count['referer_check'] > 0;
+            $has_input_sanitization = $this->security_validation_count['input_sanitization'] > 0;
             
-            // Calcular nivel de mitigación
-            $mitigation_count = ($has_nonce_validation ? 1 : 0) + 
-                               ($has_rate_limiting ? 1 : 0) + 
-                               ($has_output_sanitization ? 1 : 0) + 
-                               ($has_domain_validation ? 1 : 0);
+            // Calcular nivel de mitigación con pesos diferenciados
+            $mitigation_count = 0;
+            $mitigation_score = 0;
+            
+            // Controles críticos (peso 2)
+            if ($has_nonce_validation) { $mitigation_count++; $mitigation_score += 2; }
+            if ($has_rate_limiting) { $mitigation_count++; $mitigation_score += 2; }
+            
+            // Controles importantes (peso 1.5)
+            if ($has_method_validation) { $mitigation_count++; $mitigation_score += 1.5; }
+            if ($has_referer_check) { $mitigation_count++; $mitigation_score += 1.5; }
+            
+            // Controles complementarios (peso 1)
+            if ($has_output_sanitization) { $mitigation_count++; $mitigation_score += 1; }
+            if ($has_domain_validation) { $mitigation_count++; $mitigation_score += 1; }
+            if ($has_input_sanitization) { $mitigation_count++; $mitigation_score += 1; }
             
             // Determinar severidad y riesgo de falso positivo basado en mitigaciones
-            if ($mitigation_count >= 3) {
+            // Umbral mejorado: score >= 5 o count >= 4 indica protecciones robustas
+            if ($mitigation_score >= 5 || $mitigation_count >= 4) {
                 // Múltiples mitigaciones presentes - alto riesgo de falso positivo
+                // Considerar como "seguro por diseño" con mitigaciones adecuadas
                 $severity = 'Low';
                 $false_positive_risk = 'high';
+                
+                $mitigations_found = [];
+                if ($has_nonce_validation) $mitigations_found[] = 'nonce-validation';
+                if ($has_rate_limiting) $mitigations_found[] = 'rate-limiting';
+                if ($has_method_validation) $mitigations_found[] = 'method-validation';
+                if ($has_referer_check) $mitigations_found[] = 'referer-check';
+                if ($has_output_sanitization) $mitigations_found[] = 'output-sanitization';
+                if ($has_domain_validation) $mitigations_found[] = 'domain-validation';
+                if ($has_input_sanitization) $mitigations_found[] = 'input-sanitization';
+                
                 $description = sprintf(
-                    __('Endpoint AJAX público detectado: %s. Múltiples controles de seguridad identificados (%d).', 'aegis-day0'),
+                    __('Endpoint AJAX público detectado: %s. Múltiples controles de seguridad identificados (%d): %s.', 'aegis-day0'),
                     $action_name,
-                    $mitigation_count
+                    $mitigation_count,
+                    implode(', ', $mitigations_found)
                 );
-                $recommendation = __('Este endpoint parece tener mitigaciones adecuadas. Verificar que las validaciones se apliquen correctamente en el callback.', 'aegis-day0');
-            } elseif ($mitigation_count >= 1) {
+                $recommendation = __('Este endpoint parece tener mitigaciones adecuadas para uso público. Verificar que las validaciones se apliquen correctamente en el callback.', 'aegis-day0');
+            } elseif ($mitigation_score >= 2 || $mitigation_count >= 2) {
                 // Algunas mitigaciones presentes - riesgo medio de falso positivo
                 $severity = 'Medium';
                 $false_positive_risk = 'medium';
@@ -1325,8 +1420,11 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
                 $mitigations_found = [];
                 if ($has_nonce_validation) $mitigations_found[] = 'nonce';
                 if ($has_rate_limiting) $mitigations_found[] = 'rate-limiting';
+                if ($has_method_validation) $mitigations_found[] = 'method-validation';
+                if ($has_referer_check) $mitigations_found[] = 'referer-check';
                 if ($has_output_sanitization) $mitigations_found[] = 'output-sanitization';
                 if ($has_domain_validation) $mitigations_found[] = 'domain-validation';
+                if ($has_input_sanitization) $mitigations_found[] = 'input-sanitization';
                 
                 $description = sprintf(
                     __('Endpoint AJAX público detectado: %s. Controles de seguridad parciales identificados: %s.', 'aegis-day0'),
@@ -1335,7 +1433,7 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
                 );
                 $recommendation = __('Verificar que todas las operaciones sensibles estén protegidas. Considerar agregar validación de nonce y rate limiting si faltan.', 'aegis-day0');
             } else {
-                // Sin mitigaciones - riesgo bajo de falso positivo
+                // Sin mitigaciones significativas - riesgo bajo de falso positivo
                 $severity = 'Medium';
                 $false_positive_risk = 'medium';
                 $description = sprintf(
@@ -1359,7 +1457,11 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
                     'has_rate_limiting' => $has_rate_limiting,
                     'has_output_sanitization' => $has_output_sanitization,
                     'has_domain_validation' => $has_domain_validation,
-                    'mitigation_count' => $mitigation_count
+                    'has_method_validation' => $has_method_validation,
+                    'has_referer_check' => $has_referer_check,
+                    'has_input_sanitization' => $has_input_sanitization,
+                    'mitigation_count' => $mitigation_count,
+                    'mitigation_score' => $mitigation_score
                 ]
             ]);
         }
