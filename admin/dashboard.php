@@ -299,8 +299,7 @@ function aegis_day0_report_frequency_cb() {
 function aegis_day0_report_time_cb() {
     $value = get_option('aegis_day0_report_time', '08:00');
     echo '<input type="time" name="aegis_day0_report_time" value="' . esc_attr($value) . '">';
-    <p class="description">Hora local del servidor para el envío de reportes.</p>
-    <?php
+    echo '<p class="description">Hora local del servidor para el envío de reportes.</p>';
 }
 
 function aegis_day0_report_recipients_cb() {
