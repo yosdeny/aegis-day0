@@ -49,6 +49,22 @@ class Aegis_Day0_Rules {
                 'severity'    => 'Low',
                 'false_positive_risk' => 'high',
                 'contextual'    => true
+            ],
+            // AJAX Security - Detectar endpoints sin autenticación (wp_ajax_nopriv_)
+            // Este patrón debe ir PRIMERO porque es más específico
+            [
+                'pattern'     => '/add_action\s*\(\s*[\'"]wp_ajax_nopriv_([^\'"]+)[\'"]/i',
+                'description' => 'Endpoint AJAX público detectado (wp_ajax_nopriv_) - Requiere revisión de seguridad',
+                'severity'    => 'Medium',
+                'false_positive_risk' => 'medium'
+            ],
+            // AJAX Actions - Detectar hooks de AJAX autenticados (excluye nopriv)
+            // Usamos lookahead negativo para evitar doble reporte
+            [
+                'pattern'     => '/add_action\s*\(\s*[\'"]wp_ajax_(?!nopriv_)([^\'"]+)[\'"]/i',
+                'description' => 'Hook AJAX autenticado detectado - Verificar nonce y capacidades',
+                'severity'    => 'Low',
+                'false_positive_risk' => 'high'
             ]
         ];
     }

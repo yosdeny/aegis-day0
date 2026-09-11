@@ -525,6 +525,14 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
         if ($node instanceof Node\Stmt\Echo_) {
             $this->analyzeEcho($node);
         }
+        
+        // Detectar hooks de AJAX (wp_ajax_nopriv_ y wp_ajax_)
+        if ($node instanceof Node\Expr\FuncCall && $node->name instanceof Node\Name) {
+            $func_name = $node->name->toString();
+            if ($func_name === 'add_action') {
+                $this->analyzeAjaxHooks($node);
+            }
+        }
 
         return null;
     }
@@ -789,6 +797,66 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
         }
         
         return false;
+    }
+
+    /**
+     * Analiza hooks de AJAX para detectar posibles vulnerabilidades
+     */
+    private function analyzeAjaxHooks(Node\Expr\FuncCall $node) {
+        // Verificar si tiene al menos un argumento
+        if (empty($node->args)) {
+            return;
+        }
+        
+        $first_arg = $node->args[0]->value;
+        
+        // Obtener el nombre del hook
+        $hook_name = '';
+        if ($first_arg instanceof Node\Scalar\String_) {
+            $hook_name = $first_arg->value;
+        }
+        
+        if (empty($hook_name)) {
+            return;
+        }
+        
+        $line = $node->getLine();
+        
+        // Detectar wp_ajax_nopriv_ (endpoints públicos sin autenticación)
+        if (strpos($hook_name, 'wp_ajax_nopriv_') === 0) {
+            $action_name = str_replace('wp_ajax_nopriv_', '', $hook_name);
+            $this->analyzer->add_alert([
+                'type' => 'ajax_security',
+                'function' => 'add_action',
+                'file' => $this->analyzer->get_current_file(),
+                'line' => $line,
+                'severity' => 'Medium',
+                'false_positive_risk' => 'medium',
+                'description' => sprintf(
+                    __('Endpoint AJAX público detectado: %s. No requiere autenticación.', 'aegis-day0'),
+                    $action_name
+                ),
+                'recommendation' => __('Verificar que este endpoint no realice operaciones sensibles. Considerar usar wp_ajax_ en su lugar e implementar validación de nonce y capacidades.', 'aegis-day0')
+            ]);
+        }
+        
+        // Detectar wp_ajax_ (endpoints autenticados - recordar verificar nonce)
+        if (strpos($hook_name, 'wp_ajax_') === 0 && strpos($hook_name, 'wp_ajax_nopriv_') !== 0) {
+            $action_name = str_replace('wp_ajax_', '', $hook_name);
+            $this->analyzer->add_alert([
+                'type' => 'ajax_security',
+                'function' => 'add_action',
+                'file' => $this->analyzer->get_current_file(),
+                'line' => $line,
+                'severity' => 'Low',
+                'false_positive_risk' => 'high',
+                'description' => sprintf(
+                    __('Hook AJAX autenticado detectado: %s. Verificar implementación de seguridad.', 'aegis-day0'),
+                    $action_name
+                ),
+                'recommendation' => __('Asegurar que el callback verifique nonce (wp_verify_nonce) y capacidades (current_user_can).', 'aegis-day0')
+            ]);
+        }
     }
 
     /**
