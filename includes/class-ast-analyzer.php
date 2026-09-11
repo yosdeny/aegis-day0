@@ -744,6 +744,12 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
         ];
         
         $func_name = $type_map[$node->type] ?? 'include';
+        
+        // CRÍTICO: Verificar si la ruta es segura antes de alertar
+        if ($this->isSafePath($expr)) {
+            return; // Ruta segura, no alertar (falso positivo común)
+        }
+        
         $uses_dynamic = false;
         $uses_user_input = false;
 
@@ -761,9 +767,11 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
             }
         }
 
+        // Solo alertar si es verdaderamente dinámico y peligroso
         if ($uses_dynamic) {
-            $severity = $uses_user_input ? 'critical' : 'high';
-            $fp_risk = $uses_user_input ? 'low' : 'medium';
+            // Bajar severidad para rutas dinámicas sin input directo de usuario
+            $severity = $uses_user_input ? 'critical' : 'medium';
+            $fp_risk = $uses_user_input ? 'low' : 'alto'; // Mejorar etiqueta para UX
 
             $this->analyzer->add_alert([
                 'type' => 'file_inclusion',
@@ -773,16 +781,68 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
                 'severity' => ucfirst($severity),
                 'false_positive_risk' => $fp_risk,
                 'description' => sprintf(
-                    __('Inclusión dinámica de archivos detectada: %s. %s', 'aegis-day0'),
+                    __('Inclusión dinámica detectada: %s. %s', 'aegis-day0'),
                     $func_name,
                     $uses_user_input 
                         ? __('La ruta incluye input de usuario - RIESGO CRÍTICO de LFI/RFI.', 'aegis-day0')
-                        : __('La ruta es dinámica - verificar origen de los datos.', 'aegis-day0')
+                        : __('Verificar que la ruta no dependa de input de usuario.', 'aegis-day0')
                 ),
                 'uses_user_input' => $uses_user_input,
-                'recommendation' => __('Usar rutas absolutas con realpath(). Implementar whitelist estricta de archivos.', 'aegis-day0')
+                'recommendation' => __('Usar rutas absolutas con constantes como __DIR__ o plugin_dir_path().', 'aegis-day0')
             ]);
         }
+    }
+
+    /**
+     * Determinar si una expresión de ruta es segura (evita falsos positivos)
+     */
+    private function isSafePath($expr) {
+        // Caso 1: String literal directo (ej: require 'file.php')
+        if ($expr instanceof Node\Scalar\String_) {
+            return true;
+        }
+
+        // Caso 2: Constante directa (ej: require ABSPATH . 'file.php')
+        if ($expr instanceof Node\Expr\ConstFetch) {
+            $name = $expr->name->toString();
+            $safeConstants = ['__DIR__', '__FILE__', 'ABSPATH', 'WP_PLUGIN_DIR'];
+            return in_array($name, $safeConstants);
+        }
+        
+        // Caso 3: Llamada a función segura (ej: require plugin_dir_path(...) . 'file.php')
+        if ($expr instanceof Node\Expr\FuncCall) {
+            if ($expr->name instanceof Node\Name) {
+                $funcName = $expr->name->toString();
+                $safeFunctions = ['plugin_dir_path', 'plugin_dir_url', 'dirname', 'get_template_directory', 'get_stylesheet_directory'];
+                if (in_array($funcName, $safeFunctions)) {
+                    return true;
+                }
+            }
+        }
+
+        // Caso 4: Concatenación que contiene elementos seguros
+        if ($expr instanceof Node\Expr\BinaryOp\Concat) {
+            return $this->concatIsSafe($expr);
+        }
+
+        return false;
+    }
+
+    /**
+     * Verificar si una concatenación es segura (contiene constantes/funciones seguras)
+     */
+    private function concatIsSafe($node) {
+        // Revisar lado izquierdo
+        if ($this->isSafePath($node->left)) {
+            return true;
+        }
+        
+        // Revisar lado derecho
+        if ($this->isSafePath($node->right)) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -1009,6 +1069,10 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
         }
         
         // Detectar wp_ajax_ (endpoints autenticados - recordar verificar nonce)
+        // MEJORA: No alertar hooks wp_ajax_ por defecto ya que son estándar y seguros si se implementan bien
+        // Solo alertar si hay indicios de problemas en el callback (esto se haría en un análisis más profundo)
+        // Por ahora, comentamos esta alerta para reducir falsos positivos significativos
+        /*
         if (strpos($hook_name, 'wp_ajax_') === 0 && strpos($hook_name, 'wp_ajax_nopriv_') !== 0) {
             $action_name = str_replace('wp_ajax_', '', $hook_name);
             $this->analyzer->add_alert([
@@ -1025,6 +1089,7 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
                 'recommendation' => __('Asegurar que el callback verifique nonce (wp_verify_nonce) y capacidades (current_user_can).', 'aegis-day0')
             ]);
         }
+        */
     }
 
     /**
