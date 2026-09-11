@@ -527,6 +527,16 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
     private $user_input_vars = [];
 
     /**
+     * Variables que contienen queries SQL peligrosos
+     */
+    private $sql_dangerous_vars = [];
+
+    /**
+     * Variables que son queries SQL base (para tracking)
+     */
+    private $sql_query_vars = [];
+
+    /**
      * Constructor
      *
      * @param Aegis_AST_Analyzer $analyzer Instancia del analizador
@@ -541,6 +551,8 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
     public function beforeTraverse(array $nodes) {
         $this->sanitized_vars = [];
         $this->user_input_vars = [];
+        $this->sql_dangerous_vars = [];
+        $this->sql_query_vars = [];
         return null;
     }
 
@@ -553,6 +565,11 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
         
         // Detectar llamadas a funciones sanitizadoras
         $this->trackSanitization($node);
+        
+        // Detectar asignaciones de queries SQL peligrosos
+        if ($node instanceof Node\Expr\Assign) {
+            $this->analyzeAssignment($node);
+        }
         
         // Detectar llamadas a funciones peligrosas
         if ($node instanceof Node\Expr\FuncCall) {
@@ -906,6 +923,11 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
                         if (in_array($var_name, $this->sanitized_vars, true)) {
                             $is_sanitized = true;
                         }
+                        // VERIFICAR: Si la variable es un query SQL peligroso construido dinámicamente
+                        if (in_array($var_name, $this->sql_dangerous_vars, true)) {
+                            $uses_user_input = true;
+                            $is_sanitized = false; // Forzar no sanitizado
+                        }
                     }
                 }
                 
@@ -1090,6 +1112,35 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
             ]);
         }
         */
+    }
+
+    /**
+     * Analiza asignaciones para detectar construcción dinámica de queries SQL
+     */
+    private function analyzeAssignment(Node\Expr\Assign $node) {
+        // Detectar asignación de string que contiene concatenación con input de usuario
+        if ($node->expr instanceof Node\Expr\BinaryOp\Concat) {
+            if ($this->containsUnsanitizedUserInput($node->expr)) {
+                // Marcar esta variable como peligrosa para SQL
+                $var_name = $this->analyzer->get_variable_name($node->var);
+                if ($var_name) {
+                    $this->sql_dangerous_vars[] = $var_name;
+                }
+            }
+        }
+        
+        // También detectar strings literales que parezcan queries SQL con variables
+        if ($node->expr instanceof Node\Scalar\String_) {
+            $string_content = $node->expr->value;
+            // Patrón simple para detectar queries SQL
+            if (preg_match('/\b(SELECT|INSERT|UPDATE|DELETE|FROM|WHERE)\b/i', $string_content)) {
+                // Es un query SQL - verificar si luego se concatena con algo
+                $var_name = $this->analyzer->get_variable_name($node->var);
+                if ($var_name) {
+                    $this->sql_query_vars[$var_name] = true;
+                }
+            }
+        }
     }
 
     /**
