@@ -108,7 +108,7 @@ class Aegis_Day0_Scanner {
                     
                     // Only send notification for non-low severity issues AND if not previously notified
                     if ($issue['severity'] !== 'Low' && !isset($previously_notified[$alert_key])) {
-                        Aegis_Day0_Notify::alert_admin($plugin_name, $issue['type'], $issue['severity']);
+                        Aegis_Day0_Notify::queue_alert($plugin_name, $issue['type'], $issue['severity']);
                         $new_notifications[$alert_key] = [
                             'plugin' => $plugin_name,
                             'type' => $issue['type'],
@@ -158,7 +158,7 @@ class Aegis_Day0_Scanner {
                         
                         // Only send notification for non-low severity issues AND if not previously notified
                         if ($issue['severity'] !== 'Low' && !isset($previously_notified[$alert_key])) {
-                            Aegis_Day0_Notify::alert_admin($plugin_name, $issue['type'], $issue['severity']);
+                            Aegis_Day0_Notify::queue_alert($plugin_name, $issue['type'], $issue['severity']);
                             $new_notifications[$alert_key] = [
                                 'plugin' => $plugin_name,
                                 'type' => $issue['type'],
@@ -209,7 +209,7 @@ class Aegis_Day0_Scanner {
 
                         // Only send notification for non-low severity issues AND if not previously notified
                         if ($issue['severity'] !== 'Low' && !isset($previously_notified[$alert_key])) {
-                            Aegis_Day0_Notify::alert_admin($plugin_name, $issue['type'], $issue['severity']);
+                            Aegis_Day0_Notify::queue_alert($plugin_name, $issue['type'], $issue['severity']);
                             $new_notifications[$alert_key] = [
                                 'plugin' => $plugin_name,
                                 'type' => $issue['type'],
@@ -257,7 +257,7 @@ class Aegis_Day0_Scanner {
                     
                     // Only send notification if not previously notified
                     if (!isset($previously_notified[$alert_key])) {
-                        Aegis_Day0_Notify::alert_admin($plugin_name, $issue['type'], $issue['severity']);
+                        Aegis_Day0_Notify::queue_alert($plugin_name, $issue['type'], $issue['severity']);
                         $new_notifications[$alert_key] = [
                             'plugin' => $plugin_name,
                             'type' => $issue['type'],
@@ -281,6 +281,11 @@ class Aegis_Day0_Scanner {
         
         // Save the updated notification state
         update_option('aegis_day0_notified_alerts', $final_notifications);
+        
+        // Enviar reporte consolidado con todas las alertas (un solo email en lugar de uno por alerta)
+        if (!empty($new_notifications)) {
+            Aegis_Day0_Notify::send_batch_report();
+        }
     }
 
     /**
