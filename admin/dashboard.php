@@ -255,42 +255,7 @@ function aegis_day0_config_page() {
 }
 
 // --- Callbacks de los campos de configuración ---
-
-function aegis_day0_auto_deactivate_cb() {
-    $value = get_option('aegis_day0_auto_deactivate', 1);
-    ?>
-    <label>
-        <input type="checkbox" name="aegis_day0_auto_deactivate" value="1" <?php checked($value, 1); ?>>
-        Desactivar plugins críticos automáticamente si tienen vulnerabilidad crítica
-    </label>
-    <p class="description">Si se marca, los plugins considerados "críticos" se desactivarán solos si se detecta una vulnerabilidad de severidad Critical.</p>
-    <?php
-}
-
-function aegis_day0_report_frequency_cb() {
-    $value = get_option('aegis_day0_report_frequency', 'weekly');
-    ?>
-    <select name="aegis_day0_report_frequency">
-        <option value="daily" <?php selected($value, 'daily'); ?>>Diario</option>
-        <option value="weekly" <?php selected($value, 'weekly'); ?>>Semanal (Recomendado)</option>
-        <option value="monthly" <?php selected($value, 'monthly'); ?>>Mensual</option>
-    </select>
-    <?php
-}
-
-function aegis_day0_report_time_cb() {
-    $value = get_option('aegis_day0_report_time', '08:00');
-    echo '<input type="time" name="aegis_day0_report_time" value="' . esc_attr($value) . '">';
-    echo '<p class="description">Hora local del servidor para el envío de reportes.</p>';
-}
-
-function aegis_day0_report_recipients_cb() {
-    $value = get_option('aegis_day0_report_recipients', get_option('admin_email'));
-    ?>
-    <input type="email" name="aegis_day0_report_recipients" value="<?php echo esc_attr($value); ?>" placeholder="admin@example.com" style="width: 100%; max-width: 400px;">
-    <p class="description">Separa múltiples emails con comas (ej: admin@site.com, security@site.com).</p>
-    <?php
-}
+// Las funciones callback de configuración están definidas en aegis-day0.php
 
 function aegis_day0_wpscan_token_cb() {
     $value = get_option('aegis_day0_wpscan_token', '');
