@@ -37,11 +37,124 @@ function aegis_day0_admin_menu() {
         'aegis-day0-config',
         'aegis_day0_config'
     );
+    
+    // Submenú - Logs (Histórico)
+    add_submenu_page(
+        'aegis-day0',
+        __('Historial de Acciones', 'aegis-day0'),
+        __('Logs', 'aegis-day0'),
+        'manage_options',
+        'aegis-day0-logs',
+        'aegis_day0_logs_page'
+    );
 }
 add_action('admin_menu', 'aegis_day0_admin_menu');
 
 /**
- * Dashboard - Vista de vulnerabilidades y logs
+ * Manejo de limpieza de logs
+ */
+function aegis_day0_handle_clear_logs() {
+    if (isset($_POST['aegis_clear_logs']) && current_user_can('manage_options')) {
+        if (!isset($_POST['aegis_clear_logs_nonce']) || !wp_verify_nonce($_POST['aegis_clear_logs_nonce'], 'aegis_clear_logs_action')) {
+            wp_die(__('Security check failed', 'aegis-day0'));
+        }
+        delete_option('aegis_day0_scan_logs');
+        wp_redirect(admin_url('admin.php?page=aegis-day0-logs&cleared=1'));
+        exit;
+    }
+}
+add_action('admin_init', 'aegis_day0_handle_clear_logs');
+
+/**
+ * Página dedicada para Logs
+ */
+function aegis_day0_logs_page() {
+    $logs = Aegis_Day0_Logger::get_logs();
+    $total_logs = count($logs);
+    $per_page = 50;
+    $current_page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
+    $total_pages = ceil($total_logs / $per_page);
+    $offset = ($current_page - 1) * $per_page;
+    $paged_logs = array_slice(array_reverse($logs), $offset, $per_page);
+    ?>
+    <div class="wrap aegis-day0-logs">
+        <h1><?php echo esc_html__('📜 Historial de Acciones y Escaneos', 'aegis-day0'); ?></h1>
+        
+        <?php if (isset($_GET['cleared'])) : ?>
+            <div class="notice notice-success is-dismissible">
+                <p><?php echo esc_html__('✅ Historial limpiado correctamente.', 'aegis-day0'); ?></p>
+            </div>
+        <?php endif; ?>
+        
+        <!-- Botón de limpiar -->
+        <div style="margin: 20px 0;">
+            <form method="post" onsubmit="return confirm('<?php echo esc_js(__('¿Estás seguro de borrar TODO el historial? Esta acción no se puede deshacer.', 'aegis-day0')); ?>');">
+                <?php wp_nonce_field('aegis_clear_logs_action', 'aegis_clear_logs_nonce'); ?>
+                <button type="submit" name="aegis_clear_logs" class="button button-link-delete">
+                    🗑️ <?php echo esc_html__('Limpiar Todo el Historial', 'aegis-day0'); ?>
+                </button>
+            </form>
+        </div>
+        
+        <?php if (empty($logs)) : ?>
+            <div class="notice notice-info">
+                <p><?php echo esc_html__('No hay registros históricos.', 'aegis-day0'); ?></p>
+            </div>
+        <?php else : ?>
+            <table class="widefat fixed striped">
+                <thead>
+                    <tr>
+                        <th><?php echo esc_html__('Fecha', 'aegis-day0'); ?></th>
+                        <th><?php echo esc_html__('Plugin', 'aegis-day0'); ?></th>
+                        <th><?php echo esc_html__('Tipo', 'aegis-day0'); ?></th>
+                        <th><?php echo esc_html__('Severidad', 'aegis-day0'); ?></th>
+                        <th><?php echo esc_html__('Fuente', 'aegis-day0'); ?></th>
+                        <th><?php echo esc_html__('Detalle', 'aegis-day0'); ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($paged_logs as $log) : ?>
+                    <tr>
+                        <td><?php echo esc_html($log['date']); ?></td>
+                        <td><?php echo esc_html($log['plugin']); ?></td>
+                        <td><?php echo esc_html($log['type']); ?></td>
+                        <td><?php echo esc_html($log['severity']); ?></td>
+                        <td><?php echo esc_html($log['source']); ?></td>
+                        <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;">
+                            <?php echo esc_html($log['action']); ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+            
+            <!-- Paginación -->
+            <?php if ($total_pages > 1) : ?>
+                <div class="tablenav">
+                    <div class="tablenav-pages">
+                        <span class="displaying-num">
+                            <?php printf(esc_html__('%d elementos', 'aegis-day0'), $total_logs); ?>
+                        </span>
+                        <?php
+                        echo paginate_links([
+                            'base' => add_query_arg('paged', '%#%'),
+                            'format' => '',
+                            'prev_text' => '&laquo;',
+                            'next_text' => '&raquo;',
+                            'total' => $total_pages,
+                            'current' => $current_page
+                        ]);
+                        ?>
+                    </div>
+                </div>
+            <?php endif; ?>
+        <?php endif; ?>
+    </div>
+    <?php
+}
+
+/**
+ * Dashboard - Vista de vulnerabilidades activas
  */
 function aegis_day0_dashboard() {
     // Verify nonce for export actions
@@ -150,46 +263,7 @@ function aegis_day0_dashboard() {
             </p>
         </div>
 
-        <h2><?php echo esc_html__('📜 Historial de acciones', 'aegis-day0'); ?></h2>
-        <table class="widefat fixed striped">
-            <thead>
-                <tr>
-                    <th><?php echo esc_html__('Fecha', 'aegis-day0'); ?></th>
-                    <th><?php echo esc_html__('Plugin', 'aegis-day0'); ?></th>
-                    <th><?php echo esc_html__('Tipo', 'aegis-day0'); ?></th>
-                    <th><?php echo esc_html__('Severidad', 'aegis-day0'); ?></th>
-                    <th><?php echo esc_html__('Fuente', 'aegis-day0'); ?></th>
-                    <th><?php echo esc_html__('Acción', 'aegis-day0'); ?></th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php
-                $logs = Aegis_Day0_Logger::get_logs();
-                if (!empty($logs)) {
-                    foreach ($logs as $log) {
-                        ?>
-                        <tr>
-                            <td><?php echo esc_html($log['date']); ?></td>
-                            <td><?php echo esc_html($log['plugin']); ?></td>
-                            <td><?php echo esc_html($log['type']); ?></td>
-                            <td><?php echo esc_html($log['severity']); ?></td>
-                            <td><?php echo esc_html($log['source']); ?></td>
-                            <td><?php echo esc_html($log['action']); ?></td>
-                        </tr>
-                        <?php
-                    }
-                } else {
-                    ?>
-                    <tr>
-                        <td colspan="6"><?php echo esc_html__('No hay registros aún', 'aegis-day0'); ?></td>
-                    </tr>
-                    <?php
-                }
-                ?>
-            </tbody>
-        </table>
-
-        <h2><?php echo esc_html__('📤 Exportar Logs', 'aegis-day0'); ?></h2>
+        <h2><?php echo esc_html__('📤 Exportar Datos', 'aegis-day0'); ?></h2>
         <form method="post">
             <?php wp_nonce_field('aegis_day0_export_action', 'aegis_day0_export_nonce'); ?>
             <button type="submit" name="aegis_day0_export" value="csv" class="button button-primary"><?php echo esc_html__('Exportar CSV', 'aegis-day0'); ?></button>
