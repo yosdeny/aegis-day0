@@ -131,6 +131,30 @@ class Aegis_AST_Analyzer {
         'check_admin_referer',
         'wp_verify_nonce',
         'wp_create_nonce',
+        'check_ajax_referer',
+    ];
+
+    /**
+     * Funciones de validación de nonce específicas para AJAX
+     */
+    private $nonce_validation_functions = [
+        'check_ajax_referer',
+        'wp_verify_nonce',
+        'wp_nonce_check',
+    ];
+
+    /**
+     * Funciones de rate limiting comunes en WordPress
+     */
+    private $rate_limiting_indicators = [
+        'set_transient',
+        'get_transient',
+        'wp_cache_get',
+        'wp_cache_set',
+        'delete_transient',
+        'rate_limit',
+        'throttle',
+        'limit_requests',
     ];
 
     /**
@@ -327,6 +351,26 @@ class Aegis_AST_Analyzer {
      */
     public function is_sql_sanitizing_function($function_name) {
         return in_array(strtolower($function_name), $this->sql_sanitizing_functions, true);
+    }
+
+    /**
+     * Verifica si una función es de validación de nonce para AJAX
+     *
+     * @param string $function_name Nombre de la función
+     * @return bool True si es función de validación de nonce
+     */
+    public function is_nonce_validation_function($function_name) {
+        return in_array(strtolower($function_name), $this->nonce_validation_functions, true);
+    }
+
+    /**
+     * Verifica si una función es un indicador de rate limiting
+     *
+     * @param string $function_name Nombre de la función
+     * @return bool True si es función de rate limiting
+     */
+    public function is_rate_limiting_function($function_name) {
+        return in_array(strtolower($function_name), $this->rate_limiting_indicators, true);
     }
 
     /**
@@ -537,6 +581,16 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
     private $sql_query_vars = [];
 
     /**
+     * Contador de funciones de validación de seguridad encontradas en el archivo
+     */
+    private $security_validation_count = [
+        'nonce_checks' => 0,
+        'rate_limiting' => 0,
+        'domain_validation' => 0,
+        'output_sanitization' => 0,
+    ];
+
+    /**
      * Constructor
      *
      * @param Aegis_AST_Analyzer $analyzer Instancia del analizador
@@ -553,6 +607,12 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
         $this->user_input_vars = [];
         $this->sql_dangerous_vars = [];
         $this->sql_query_vars = [];
+        $this->security_validation_count = [
+            'nonce_checks' => 0,
+            'rate_limiting' => 0,
+            'domain_validation' => 0,
+            'output_sanitization' => 0,
+        ];
         return null;
     }
 
@@ -565,6 +625,9 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
         
         // Detectar llamadas a funciones sanitizadoras
         $this->trackSanitization($node);
+        
+        // Detectar funciones de validación de seguridad para contexto AJAX
+        $this->trackSecurityValidations($node);
         
         // Detectar asignaciones de queries SQL peligrosos
         if ($node instanceof Node\Expr\Assign) {
@@ -641,6 +704,48 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
                     if ($var_name) {
                         $this->sanitized_vars[] = $var_name;
                     }
+                }
+            }
+        }
+    }
+
+    /**
+     * Rastrea funciones de validación de seguridad para análisis contextual AJAX
+     * Esto ayuda a identificar endpoints que tienen mitigaciones implementadas
+     */
+    private function trackSecurityValidations(Node $node) {
+        if ($node instanceof Node\Expr\FuncCall && $node->name instanceof Node\Name) {
+            $func_name = $node->name->toString();
+            
+            // Contar validaciones de nonce
+            if ($this->analyzer->is_nonce_validation_function($func_name)) {
+                $this->security_validation_count['nonce_checks']++;
+            }
+            
+            // Contar funciones de rate limiting
+            if ($this->analyzer->is_rate_limiting_function($func_name)) {
+                $this->security_validation_count['rate_limiting']++;
+            }
+            
+            // Detectar sanitización de salida (XSS prevention)
+            if (in_array(strtolower($func_name), ['esc_html', 'esc_attr', 'esc_url', 'esc_js', 'wp_kses', 'wp_kses_post'], true)) {
+                $this->security_validation_count['output_sanitization']++;
+            }
+            
+            // Detectar validación de dominio (SSRF prevention)
+            if ($func_name === 'wp_parse_url' || $func_name === 'parse_url' || 
+                strpos($func_name, 'domain') !== false || strpos($func_name, 'host') !== false) {
+                $this->security_validation_count['domain_validation']++;
+            }
+        }
+        
+        // Detectar validaciones condicionales en expresiones
+        if ($node instanceof Node\Stmt\If_) {
+            $condition = $node->cond;
+            if ($condition instanceof Node\Expr\FuncCall && $condition->name instanceof Node\Name) {
+                $func_name = $condition->name->toString();
+                if ($this->analyzer->is_nonce_validation_function($func_name)) {
+                    $this->security_validation_count['nonce_checks']++;
                 }
             }
         }
@@ -1163,6 +1268,7 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
 
     /**
      * Analiza hooks de AJAX para detectar posibles vulnerabilidades
+     * Implementa análisis contextual para identificar falsos positivos basados en mitigaciones
      */
     private function analyzeAjaxHooks(Node\Expr\FuncCall $node) {
         // Verificar si tiene al menos un argumento
@@ -1187,18 +1293,74 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
         // Detectar wp_ajax_nopriv_ (endpoints públicos sin autenticación)
         if (strpos($hook_name, 'wp_ajax_nopriv_') === 0) {
             $action_name = str_replace('wp_ajax_nopriv_', '', $hook_name);
+            
+            // Análisis contextual: verificar si existen mitigaciones de seguridad
+            $has_nonce_validation = $this->security_validation_count['nonce_checks'] > 0;
+            $has_rate_limiting = $this->security_validation_count['rate_limiting'] > 0;
+            $has_output_sanitization = $this->security_validation_count['output_sanitization'] > 0;
+            $has_domain_validation = $this->security_validation_count['domain_validation'] > 0;
+            
+            // Calcular nivel de mitigación
+            $mitigation_count = ($has_nonce_validation ? 1 : 0) + 
+                               ($has_rate_limiting ? 1 : 0) + 
+                               ($has_output_sanitization ? 1 : 0) + 
+                               ($has_domain_validation ? 1 : 0);
+            
+            // Determinar severidad y riesgo de falso positivo basado en mitigaciones
+            if ($mitigation_count >= 3) {
+                // Múltiples mitigaciones presentes - alto riesgo de falso positivo
+                $severity = 'Low';
+                $false_positive_risk = 'high';
+                $description = sprintf(
+                    __('Endpoint AJAX público detectado: %s. Múltiples controles de seguridad identificados (%d).', 'aegis-day0'),
+                    $action_name,
+                    $mitigation_count
+                );
+                $recommendation = __('Este endpoint parece tener mitigaciones adecuadas. Verificar que las validaciones se apliquen correctamente en el callback.', 'aegis-day0');
+            } elseif ($mitigation_count >= 1) {
+                // Algunas mitigaciones presentes - riesgo medio de falso positivo
+                $severity = 'Medium';
+                $false_positive_risk = 'medium';
+                
+                $mitigations_found = [];
+                if ($has_nonce_validation) $mitigations_found[] = 'nonce';
+                if ($has_rate_limiting) $mitigations_found[] = 'rate-limiting';
+                if ($has_output_sanitization) $mitigations_found[] = 'output-sanitization';
+                if ($has_domain_validation) $mitigations_found[] = 'domain-validation';
+                
+                $description = sprintf(
+                    __('Endpoint AJAX público detectado: %s. Controles de seguridad parciales identificados: %s.', 'aegis-day0'),
+                    $action_name,
+                    implode(', ', $mitigations_found)
+                );
+                $recommendation = __('Verificar que todas las operaciones sensibles estén protegidas. Considerar agregar validación de nonce y rate limiting si faltan.', 'aegis-day0');
+            } else {
+                // Sin mitigaciones - riesgo bajo de falso positivo
+                $severity = 'Medium';
+                $false_positive_risk = 'medium';
+                $description = sprintf(
+                    __('Endpoint AJAX público detectado: %s. No requiere autenticación.', 'aegis-day0'),
+                    $action_name
+                );
+                $recommendation = __('Verificar que este endpoint no realice operaciones sensibles. Implementar validación de nonce, rate limiting y sanitización de salida.', 'aegis-day0');
+            }
+            
             $this->analyzer->add_alert([
                 'type' => 'ajax_security',
                 'function' => 'add_action',
                 'file' => $this->analyzer->get_current_file(),
                 'line' => $line,
-                'severity' => 'Medium',
-                'false_positive_risk' => 'medium',
-                'description' => sprintf(
-                    __('Endpoint AJAX público detectado: %s. No requiere autenticación.', 'aegis-day0'),
-                    $action_name
-                ),
-                'recommendation' => __('Verificar que este endpoint no realice operaciones sensibles. Considerar usar wp_ajax_ en su lugar e implementar validación de nonce y capacidades.', 'aegis-day0')
+                'severity' => $severity,
+                'false_positive_risk' => $false_positive_risk,
+                'description' => $description,
+                'recommendation' => $recommendation,
+                'security_context' => [
+                    'has_nonce_validation' => $has_nonce_validation,
+                    'has_rate_limiting' => $has_rate_limiting,
+                    'has_output_sanitization' => $has_output_sanitization,
+                    'has_domain_validation' => $has_domain_validation,
+                    'mitigation_count' => $mitigation_count
+                ]
             ]);
         }
         
