@@ -3,7 +3,7 @@
  * Plugin Name: Aegis Day0
  * Plugin URI: https://github.com/yosdeny
  * Description: Detección proactiva de vulnerabilidades día 0 en plugins de WordPress.
- * Version: 0.2
+ * Version: 0.4
  * Author: YGB
  * Author URI: https://github.com/yosdeny
  * Text Domain: aegis-day0
