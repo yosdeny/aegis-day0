@@ -240,7 +240,7 @@ function aegis_day0_config_page() {
         <form method="post" action="options.php" style="background: #fff; padding: 20px; border: 1px solid #ccd0d4; max-width: 800px;">
             <?php
             settings_fields('aegis_day0_settings_group');
-            do_settings_sections('aegis_day0_settings_group');
+            do_settings_sections('aegis_day0_settings_page');
             submit_button('Guardar Configuración', 'primary', 'submit', true, ['style' => 'margin-top: 20px;']);
             ?>
         </form>

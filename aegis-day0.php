@@ -82,27 +82,43 @@ function aegis_day0_force_scan() {
 
 // Settings
 function aegis_day0_register_settings() {
-    register_setting('aegis_day0_settings', 'aegis_day0_auto_disable', [
+    // Registrar sección
+    add_settings_section(
+        'aegis_day0_main_section',
+        'Configuración Principal',
+        null,
+        'aegis_day0_settings_page'
+    );
+    
+    // Registrar campos
+    add_settings_field('aegis_day0_auto_disable', 'Auto Desactivar', 'aegis_day0_auto_deactivate_cb', 'aegis_day0_settings_page', 'aegis_day0_main_section');
+    add_settings_field('aegis_day0_report_frequency', 'Frecuencia de Reportes', 'aegis_day0_report_frequency_cb', 'aegis_day0_settings_page', 'aegis_day0_main_section');
+    add_settings_field('aegis_day0_report_time', 'Hora de Reporte', 'aegis_day0_report_time_cb', 'aegis_day0_settings_page', 'aegis_day0_main_section');
+    add_settings_field('aegis_day0_report_recipients', 'Destinatarios', 'aegis_day0_report_recipients_cb', 'aegis_day0_settings_page', 'aegis_day0_main_section');
+    add_settings_field('aegis_day0_wpscan_token', 'WPScan Token', 'aegis_day0_wpscan_token_cb', 'aegis_day0_settings_page', 'aegis_day0_main_section');
+    
+    // Registrar opciones
+    register_setting('aegis_day0_settings_group', 'aegis_day0_auto_disable', [
         'type' => 'integer',
         'sanitize_callback' => 'absint',
         'default' => 0
     ]);
-    register_setting('aegis_day0_settings', 'aegis_day0_report_frequency', [
+    register_setting('aegis_day0_settings_group', 'aegis_day0_report_frequency', [
         'type' => 'string',
         'sanitize_callback' => 'sanitize_text_field',
         'default' => 'weekly'
     ]);
-    register_setting('aegis_day0_settings', 'aegis_day0_report_time', [
+    register_setting('aegis_day0_settings_group', 'aegis_day0_report_time', [
         'type' => 'string',
         'sanitize_callback' => 'sanitize_text_field',
         'default' => '08:00'
     ]);
-    register_setting('aegis_day0_settings', 'aegis_day0_report_recipients', [
+    register_setting('aegis_day0_settings_group', 'aegis_day0_report_recipients', [
         'type' => 'string',
         'sanitize_callback' => 'sanitize_text_field',
         'default' => ''
     ]);
-    register_setting('aegis_day0_settings', 'aegis_day0_wpscan_token', [
+    register_setting('aegis_day0_settings_group', 'aegis_day0_wpscan_token', [
         'type' => 'string',
         'sanitize_callback' => 'sanitize_text_field',
         'default' => ''
