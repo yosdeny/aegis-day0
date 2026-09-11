@@ -89,7 +89,7 @@ add_action('admin_init', 'aegis_day0_handle_force_scan');
 function aegis_day0_dashboard_page() {
     $alerts = get_option('aegis_day0_alerts', []);
     ?>
-    <div class="wrap">
+    <div class="wrap aegis-day0-dashboard">
         <h1 style="margin-bottom: 20px;">🛡️ Dashboard de Seguridad</h1>
         
         <!-- Botón de Escaneo Manual -->
@@ -106,32 +106,34 @@ function aegis_day0_dashboard_page() {
         <?php if (empty($alerts)) : ?>
             <div class="notice notice-success inline"><p>✅ No se detectaron vulnerabilidades activas en este momento.</p></div>
         <?php else : ?>
-            <table class="wp-list-table widefat fixed striped">
-                <thead>
-                    <tr>
-                        <th style="width: 20%;">Plugin</th>
-                        <th style="width: 35%;">Tipo</th>
-                        <th style="width: 10%;">Severidad</th>
-                        <th style="width: 15%;">Fuente</th>
-                        <th style="width: 20%;">Riesgo Falso Positivo</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($alerts as $alert) : 
-                        $fp_risk = isset($alert['false_positive_risk']) ? $alert['false_positive_risk'] : 'Desconocido';
-                        $icon = ($fp_risk === 'Alto') ? '⚠️' : (($fp_risk === 'Medio') ? '◐' : '✅');
-                        $severity_color = ($alert['severity'] === 'Critical') ? 'red' : 'orange';
-                    ?>
-                    <tr>
-                        <td><strong><?php echo esc_html($alert['plugin']); ?></strong></td>
-                        <td><?php echo esc_html($alert['type']); ?></td>
-                        <td><span style="color: <?php echo $severity_color; ?>; font-weight: bold;"><?php echo esc_html($alert['severity']); ?></span></td>
-                        <td><?php echo esc_html($alert['source']); ?></td>
-                        <td><?php echo $icon . ' ' . esc_html($fp_risk); ?></td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
+            <div class="aegis-day0-logs-table-wrapper">
+                <table class="wp-list-table widefat fixed striped">
+                    <thead>
+                        <tr>
+                            <th style="width: 20%;">Plugin</th>
+                            <th style="width: 35%;">Tipo</th>
+                            <th style="width: 10%;">Severidad</th>
+                            <th style="width: 15%;">Fuente</th>
+                            <th style="width: 20%;">Riesgo Falso Positivo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($alerts as $alert) : 
+                            $fp_risk = isset($alert['false_positive_risk']) ? $alert['false_positive_risk'] : 'Desconocido';
+                            $icon = ($fp_risk === 'Alto') ? '⚠️' : (($fp_risk === 'Medio') ? '◐' : '✅');
+                            $severity_color = ($alert['severity'] === 'Critical') ? 'red' : 'orange';
+                        ?>
+                        <tr>
+                            <td><strong><?php echo esc_html($alert['plugin']); ?></strong></td>
+                            <td><?php echo esc_html($alert['type']); ?></td>
+                            <td><span style="color: <?php echo $severity_color; ?>; font-weight: bold;"><?php echo esc_html($alert['severity']); ?></span></td>
+                            <td><?php echo esc_html($alert['source']); ?></td>
+                            <td><?php echo $icon . ' ' . esc_html($fp_risk); ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
         <?php endif; ?>
     </div>
     <?php
@@ -154,7 +156,7 @@ function aegis_day0_logs_page() {
     $reversed_logs = array_reverse($logs);
     $paged_logs = array_slice($reversed_logs, $offset, $per_page);
     ?>
-    <div class="wrap">
+    <div class="wrap aegis-day0-dashboard">
         <h1 style="margin-bottom: 20px;">📜 Historial de Acciones y Escaneos</h1>
         
         <?php if (isset($_GET['cleared'])) : ?>
@@ -184,32 +186,34 @@ function aegis_day0_logs_page() {
         <?php if (empty($logs)) : ?>
             <div class="notice notice-info"><p>ℹ️ No hay registros históricos disponibles.</p></div>
         <?php else : ?>
-            <table class="wp-list-table widefat fixed striped">
-                <thead>
-                    <tr>
-                        <th style="width: 15%;">Fecha</th>
-                        <th style="width: 15%;">Plugin</th>
-                        <th style="width: 25%;">Tipo</th>
-                        <th style="width: 10%;">Severidad</th>
-                        <th style="width: 10%;">Fuente</th>
-                        <th style="width: 25%;">Acción</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($paged_logs as $log) : ?>
-                    <tr>
-                        <td><?php echo esc_html($log['date']); ?></td>
-                        <td><?php echo esc_html($log['plugin']); ?></td>
-                        <td><?php echo esc_html($log['type']); ?></td>
-                        <td><?php echo esc_html($log['severity']); ?></td>
-                        <td><?php echo esc_html($log['source']); ?></td>
-                        <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="<?php echo esc_attr($log['action']); ?>">
-                            <?php echo esc_html($log['action']); ?>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
+            <div class="aegis-day0-logs-table-wrapper">
+                <table class="wp-list-table widefat fixed striped">
+                    <thead>
+                        <tr>
+                            <th style="width: 15%;">Fecha</th>
+                            <th style="width: 15%;">Plugin</th>
+                            <th style="width: 25%;">Tipo</th>
+                            <th style="width: 10%;">Severidad</th>
+                            <th style="width: 10%;">Fuente</th>
+                            <th style="width: 25%;">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($paged_logs as $log) : ?>
+                        <tr>
+                            <td><?php echo esc_html($log['date']); ?></td>
+                            <td><?php echo esc_html($log['plugin']); ?></td>
+                            <td><?php echo esc_html($log['type']); ?></td>
+                            <td><?php echo esc_html($log['severity']); ?></td>
+                            <td><?php echo esc_html($log['source']); ?></td>
+                            <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="<?php echo esc_attr($log['action']); ?>">
+                                <?php echo esc_html($log['action']); ?>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
 
             <!-- Paginación -->
             <?php if ($total_pages > 1) : ?>
@@ -241,7 +245,7 @@ function aegis_day0_logs_page() {
 function aegis_day0_config_page() {
     settings_errors();
     ?>
-    <div class="wrap">
+    <div class="wrap aegis-day0-dashboard">
         <h1 style="margin-bottom: 20px;">⚙️ Configuración de Aegis Day0</h1>
         <form method="post" action="options.php" style="background: #fff; padding: 20px; border: 1px solid #ccd0d4; max-width: 800px;">
             <?php

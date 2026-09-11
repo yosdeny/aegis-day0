@@ -1,30 +1,111 @@
 /* Estilos para el dashboard de Aegis Day0 */
 
+.aegis-day0-dashboard {
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
 .aegis-day0-dashboard h1 {
     color: #2c3e50;
     font-weight: 700;
     margin-bottom: 20px;
+    font-size: 23px;
+}
+
+@media screen and (max-width: 782px) {
+    .aegis-day0-dashboard h1 {
+        font-size: 20px;
+    }
 }
 
 .aegis-day0-dashboard h2 {
     color: #34495e;
     margin-top: 30px;
     margin-bottom: 15px;
+    font-size: 20px;
+}
+
+@media screen and (max-width: 782px) {
+    .aegis-day0-dashboard h2 {
+        font-size: 18px;
+    }
 }
 
 .aegis-day0-dashboard table.widefat {
     margin-top: 10px;
     border: 1px solid #ddd;
+    width: 100%;
+    max-width: 100%;
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.aegis-day0-dashboard table.widefat thead,
+.aegis-day0-dashboard table.widefat tbody,
+.aegis-day0-dashboard table.widefat tr,
+.aegis-day0-dashboard table.widefat th,
+.aegis-day0-dashboard table.widefat td {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+    box-sizing: border-box;
 }
 
 .aegis-day0-dashboard table.widefat th {
     background-color: #f4f6f7;
     font-weight: 600;
     text-align: left;
+    word-wrap: break-word;
+    padding: 8px;
 }
 
 .aegis-day0-dashboard table.widefat td {
     padding: 8px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+/* Columnas específicas con anchos adaptativos */
+.aegis-day0-dashboard table.widefat th:nth-child(1),
+.aegis-day0-dashboard table.widefat td:nth-child(1) {
+    width: 20%;
+}
+
+.aegis-day0-dashboard table.widefat th:nth-child(2),
+.aegis-day0-dashboard table.widefat td:nth-child(2) {
+    width: 35%;
+}
+
+.aegis-day0-dashboard table.widefat th:nth-child(3),
+.aegis-day0-dashboard table.widefat td:nth-child(3) {
+    width: 10%;
+}
+
+.aegis-day0-dashboard table.widefat th:nth-child(4),
+.aegis-day0-dashboard table.widefat td:nth-child(4) {
+    width: 15%;
+}
+
+.aegis-day0-dashboard table.widefat th:nth-child(5),
+.aegis-day0-dashboard table.widefat td:nth-child(5) {
+    width: 20%;
+}
+
+@media screen and (max-width: 782px) {
+    .aegis-day0-dashboard table.widefat th:nth-child(1),
+    .aegis-day0-dashboard table.widefat td:nth-child(1),
+    .aegis-day0-dashboard table.widefat th:nth-child(2),
+    .aegis-day0-dashboard table.widefat td:nth-child(2),
+    .aegis-day0-dashboard table.widefat th:nth-child(3),
+    .aegis-day0-dashboard table.widefat td:nth-child(3),
+    .aegis-day0-dashboard table.widefat th:nth-child(4),
+    .aegis-day0-dashboard table.widefat td:nth-child(4),
+    .aegis-day0-dashboard table.widefat th:nth-child(5),
+    .aegis-day0-dashboard table.widefat td:nth-child(5) {
+        width: auto;
+        min-width: 120px;
+    }
 }
 
 .aegis-day0-dashboard .button-primary {
@@ -41,4 +122,75 @@
 
 .aegis-day0-dashboard .button {
     margin-right: 10px;
+    margin-bottom: 10px;
+}
+
+/* Contenedor responsivo para formularios */
+.aegis-day0-dashboard form {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+/* Ajustes para pantallas pequeñas */
+@media screen and (max-width: 782px) {
+    .aegis-day0-dashboard .wrap {
+        padding: 10px;
+    }
+    
+    .aegis-day0-dashboard .button {
+        width: 100%;
+        margin-right: 0;
+        margin-bottom: 10px;
+    }
+    
+    .aegis-day0-dashboard input[type="text"],
+    .aegis-day0-dashboard input[type="email"],
+    .aegis-day0-dashboard select {
+        max-width: 100%;
+        width: 100%;
+    }
+}
+
+/* Estilo para mensajes de notificación */
+.aegis-day0-dashboard .notice {
+    max-width: 100%;
+    margin: 10px 0;
+    box-sizing: border-box;
+}
+
+/* Tabla de logs con scroll horizontal */
+.aegis-day0-logs-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-top: 10px;
+}
+
+.aegis-day0-logs-table-wrapper table {
+    min-width: 800px;
+}
+
+/* Paginación responsiva */
+.aegis-day0-dashboard .tablenav {
+    overflow-x: auto;
+    padding: 10px 0;
+}
+
+.aegis-day0-dashboard .tablenav-pages {
+    float: none;
+    display: inline-block;
+}
+
+@media screen and (max-width: 782px) {
+    .aegis-day0-dashboard .tablenav .tablenav-pages {
+        float: none;
+        display: block;
+        text-align: center;
+    }
+    
+    .aegis-day0-dashboard .tablenav .displaying-num {
+        float: none;
+        display: block;
+        text-align: center;
+        margin-bottom: 10px;
+    }
 }
