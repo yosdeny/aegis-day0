@@ -47,6 +47,9 @@ add_action('admin_enqueue_scripts', 'aegis_day0_enqueue_admin_styles');
 
 // Inicialización - movido a cron para evitar ejecución en cada carga de página
 function aegis_day0_init() {
+    // Inicializar sistema de notificaciones por lotes
+    Aegis_Day0_Notify::init_batch_notifications();
+    
     $scanner = new Aegis_Day0_Scanner();
     $scanner->run_checks();
 }
