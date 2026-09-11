@@ -84,6 +84,27 @@ function aegis_day0_handle_force_scan() {
 add_action('admin_init', 'aegis_day0_handle_force_scan');
 
 /**
+ * Maneja la acción de limpiar alertas y realizar escaneo limpio
+ */
+function aegis_day0_handle_clean_scan() {
+    if (isset($_POST['clean_scan']) && check_admin_referer('aegis_clean_scan_action')) {
+        if (current_user_can('manage_options')) {
+            // Limpiar alertas almacenadas
+            delete_option('aegis_day0_alerts');
+            delete_option('aegis_day0_notified_alerts');
+            delete_transient('aegis_day0_last_scan');
+            
+            // Ejecutar nuevo escaneo limpio
+            $scanner = new Aegis_Day0_Scanner();
+            $scanner->run_checks();
+            
+            echo '<div class="notice notice-success is-dismissible"><p>🧹 Escaneo limpio completado. Se eliminaron los falsos positivos anteriores.</p></div>';
+        }
+    }
+}
+add_action('admin_init', 'aegis_day0_handle_clean_scan');
+
+/**
  * Renderiza la pagina del Dashboard
  */
 function aegis_day0_dashboard_page() {
@@ -92,13 +113,21 @@ function aegis_day0_dashboard_page() {
     <div class="wrap aegis-day0-dashboard">
         <h1 style="margin-bottom: 20px;">🛡️ Dashboard de Seguridad</h1>
         
-        <!-- Botón de Escaneo Manual -->
+        <!-- Botones de Acción -->
         <form method="post" style="margin-bottom: 30px; background: #f0f0f1; padding: 20px; border-radius: 4px;">
             <?php wp_nonce_field('aegis_force_scan_action'); ?>
             <button type="submit" name="force_scan" class="button button-primary button-large">
                 🔄 Ejecutar Escaneo Ahora
             </button>
             <span style="margin-left: 10px; color: #666;">Escanea todos los plugins en busca de vulnerabilidades 0-day</span>
+        </form>
+        
+        <form method="post" style="margin-bottom: 30px; background: #e8f4f8; padding: 20px; border-radius: 4px; border-left: 4px solid #2271b1;">
+            <?php wp_nonce_field('aegis_clean_scan_action'); ?>
+            <button type="submit" name="clean_scan" class="button button-secondary button-large" onclick="return confirm('⚠️ Esto eliminará todas las alertas almacenadas y realizará un escaneo completamente limpio.\\n\\n¿Estás seguro?');">
+                🧹 Limpiar Alertas y Re-escanear
+            </button>
+            <span style="margin-left: 10px; color: #666;">Elimina falsos positivos previos y ejecuta un escaneo desde cero con las nuevas reglas</span>
         </form>
 
         <!-- Tabla de Vulnerabilidades -->
