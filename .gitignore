@@ -1,25 +1,22 @@
+```php
 # Compiled and build artifacts
 *.pyc
 __pycache__/
 *.o
 *.obj
 *.class
-*.exe
-*.dll
 *.so
-*.a
+*.dll
+*.exe
 *.out
 
 # Dependencies
-.venv/
-venv/
 node_modules/
-dist/
-build/
-target/
-.gradle/
-.mypy_cache/
-.pytest_cache/
+venv/
+.venv/
+.env
+.env.local
+.env.*
 
 # Logs and temp files
 *.log
@@ -27,10 +24,15 @@ target/
 *.swp
 *.swo
 
-# Environment
-.env
-.env.local
-*.env.*
+# Build directories
+dist/
+build/
+target/
+coverage/
+htmlcov/
+.mypy_cache/
+.pytest_cache/
+.gradle/
 
 # Editors
 .vscode/
@@ -39,17 +41,40 @@ target/
 # System files
 .DS_Store
 Thumbs.db
-
-# Coverage
-coverage/
-htmlcov/
-.coverage
-
-# Compressed files
+*.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Icon?
+iTunes_Control/
+Network Trash Folder/
+Temporary Items/
+VolumeIcon.icns
+*.nib
+*.so.dSYM
+*.dSYM/
+*.swp
+*.swo
+*~
+\#*\#
+.\#*
+%*%
+._*
+CVS/
+RCS/
+SCCS/
+[Tt]ag
+[Tt]ags
+.MF
+classes/
+*.tar*
+*.jar
+*.war
+*.ear
 *.zip
 *.gz
-*.tar
-*.tgz
 *.bz2
 *.xz
 *.7z
@@ -68,3 +93,46 @@ htmlcov/
 *.tar.bz2
 *.tar.xz
 *.tar.zst
+*.tmp
+*.temp
+*.bak
+*.backup
+*.swp
+*.swo
+*~
+\#*\#
+.\#*
+%*%
+._*
+CVS/
+RCS/
+SCCS/
+[Tt]ag
+[Tt]ags
+.MF
+classes/
+*.tar*
+*.jar
+*.war
+*.ear
+*.zip
+*.gz
+*.bz2
+*.xz
+*.7z
+*.rar
+*.zst
+*.lz4
+*.lzh
+*.cab
+*.arj
+*.rpm
+*.deb
+*.Z
+*.lz
+*.lzo
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.tar.zst
+```
