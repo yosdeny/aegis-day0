@@ -1,1 +1,1 @@
-Nothing needs to be added to the .gitignore file based on the provided changes. The modification of 'includes/class-scanner.php' does not require any new ignore rules.
+Nothing should be ignored in this case, as the changes only include PHP source files (.php) and no build artifacts, dependencies, or temporary files.
