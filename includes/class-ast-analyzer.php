@@ -822,16 +822,31 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
         // Caso 2: Constante directa (ej: require ABSPATH . 'file.php')
         if ($expr instanceof Node\Expr\ConstFetch) {
             $name = $expr->name->toString();
-            $safeConstants = ['__DIR__', '__FILE__', 'ABSPATH', 'WP_PLUGIN_DIR'];
-            return in_array($name, $safeConstants);
+            // Constantes de WordPress conocidas como seguras
+            $safeConstants = [
+                '__DIR__', '__FILE__', 
+                'ABSPATH', 'WP_PLUGIN_DIR', 'WP_CONTENT_DIR', 
+                'TEMPLATEPATH', 'STYLESHEETPATH',
+                'WP_TEMP_DIR'
+            ];
+            if (in_array($name, $safeConstants, true)) {
+                return true;
+            }
+            // Constantes personalizadas que siguen patrones seguros
+            // Ej: AEGIS_DAY0_PLUGIN_DIR, YGB_E2_PLUGIN_DIR, MYPLUGIN_PATH, etc.
+            // Patrón flexible: debe contener palabras clave como PLUGIN, THEME, TEMPLATE, CONTENT, MODULE + DIR/PATH
+            if (preg_match('/(?:PLUGIN|THEME|TEMPLATE|STYLE|CONTENT|MODULE|COMPONENT|APP|BASE).*(?:DIR|PATH)|(?:DIR|PATH).*(?:PLUGIN|THEME|TEMPLATE|STYLE|CONTENT|MODULE)/i', $name)) {
+                return true;
+            }
+            return false;
         }
         
         // Caso 3: Llamada a función segura (ej: require plugin_dir_path(...) . 'file.php')
         if ($expr instanceof Node\Expr\FuncCall) {
             if ($expr->name instanceof Node\Name) {
                 $funcName = $expr->name->toString();
-                $safeFunctions = ['plugin_dir_path', 'plugin_dir_url', 'dirname', 'get_template_directory', 'get_stylesheet_directory'];
-                if (in_array($funcName, $safeFunctions)) {
+                $safeFunctions = ['plugin_dir_path', 'plugin_dir_url', 'dirname', 'get_template_directory', 'get_stylesheet_directory', 'get_home_path', 'trailingslashit', 'untrailingslashit'];
+                if (in_array($funcName, $safeFunctions, true)) {
                     return true;
                 }
             }
