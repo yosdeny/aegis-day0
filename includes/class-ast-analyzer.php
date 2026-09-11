@@ -182,6 +182,15 @@ class Aegis_AST_Analyzer {
     }
 
     /**
+     * Obtiene el archivo actual
+     * 
+     * @return string Ruta del archivo actual
+     */
+    public function get_current_file() {
+        return $this->current_file;
+    }
+
+    /**
      * Analiza un archivo PHP usando AST
      *
      * @param string $file_path Ruta del archivo a analizar
@@ -634,7 +643,7 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
             $this->analyzer->add_alert([
                 'type' => $func_info['type'],
                 'function' => $func_str,
-                'file' => $this->analyzer->current_file,
+                'file' => $this->analyzer->get_current_file(),
                 'line' => $line,
                 'severity' => ucfirst($adjusted_severity),
                 'false_positive_risk' => $false_positive_risk,
@@ -703,7 +712,7 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
             $this->analyzer->add_alert([
                 'type' => 'file_inclusion',
                 'function' => $func_name,
-                'file' => $this->analyzer->current_file,
+                'file' => $this->analyzer->get_current_file(),
                 'line' => $line,
                 'severity' => ucfirst($severity),
                 'false_positive_risk' => $fp_risk,
@@ -755,7 +764,7 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
                 $this->analyzer->add_alert([
                     'type' => 'potential_xss',
                     'function' => 'echo',
-                    'file' => $this->analyzer->current_file,
+                    'file' => $this->analyzer->get_current_file(),
                     'line' => $line,
                     'severity' => 'High',
                     'false_positive_risk' => 'medium',
