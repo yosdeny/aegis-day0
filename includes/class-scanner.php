@@ -49,9 +49,34 @@ class Aegis_Day0_Scanner {
         $previously_notified = get_option('aegis_day0_notified_alerts', []);
         $currently_detected = []; // Track what's currently detected
         $new_notifications = []; // Track new alerts to notify
+        
+        // Obtener ruta del plugin actual para excluirlo del escaneo (evitar falsos positivos en el propio plugin)
+        $self_plugin_file = 'aegis-day0/aegis-day0.php';
+        if (defined('AEGIS_DAY0_PLUGIN_DIR')) {
+            // Extraer nombre relativo del plugin desde la ruta absoluta
+            $plugin_dir = basename(dirname(AEGIS_DAY0_PLUGIN_DIR));
+            $self_plugin_file = $plugin_dir . '/aegis-day0.php';
+        }
+        
+        // Nombres alternativos posibles para el plugin actual
+        $self_plugin_names = [
+            'aegis-day0/aegis-day0.php',
+            'aegis-day0.php',
+            'Aegis Day0',
+            'YGB Escudo 2'
+        ];
 
         foreach ($plugins as $plugin_file => $plugin_data) {
-            $plugin_name = sanitize_text_field($plugin_data['Name']);
+            // EXCLUIR el propio plugin Aegis Day0 del escaneo para evitar falsos positivos
+            $plugin_name_check = sanitize_text_field($plugin_data['Name']);
+            if ($plugin_file === $self_plugin_file || 
+                strpos($plugin_file, 'aegis-day0') !== false || 
+                strpos($plugin_file, 'ygb-escudo') !== false ||
+                in_array($plugin_name_check, $self_plugin_names, true)) {
+                continue;
+            }
+            
+            $plugin_name = $plugin_name_check;
 
             // Static scan con reglas regex (método tradicional)
             $issues = $this->static_scan($plugin_file);

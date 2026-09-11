@@ -904,7 +904,23 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
     private function isSafeBase($node) {
         // Constantes directas (__DIR__, ABSPATH, etc.)
         if ($node instanceof Node\Expr\ConstFetch) {
-            return true;
+            $name = $node->name->toString();
+            // Constantes de WordPress conocidas como seguras
+            $safeConstants = [
+                '__DIR__', '__FILE__', 
+                'ABSPATH', 'WP_PLUGIN_DIR', 'WP_CONTENT_DIR', 
+                'TEMPLATEPATH', 'STYLESHEETPATH',
+                'WP_TEMP_DIR'
+            ];
+            if (in_array($name, $safeConstants, true)) {
+                return true;
+            }
+            // Constantes personalizadas que siguen patrones seguros
+            // Ej: AEGIS_DAY0_PLUGIN_DIR, YGB_E2_PLUGIN_DIR, MYPLUGIN_PATH, etc.
+            if (preg_match('/(?:PLUGIN|THEME|TEMPLATE|STYLE|CONTENT|MODULE|COMPONENT|APP|BASE).*(?:DIR|PATH)|(?:DIR|PATH).*(?:PLUGIN|THEME|TEMPLATE|STYLE|CONTENT|MODULE)/i', $name)) {
+                return true;
+            }
+            return false;
         }
         
         // Llamadas a funciones seguras (plugin_dir_path, etc.)
