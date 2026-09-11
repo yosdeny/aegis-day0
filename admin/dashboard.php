@@ -147,7 +147,7 @@ function aegis_day0_dashboard_page() {
  * Renderiza la página de Logs (Histórico)
  */
 function aegis_day0_logs_page() {
-    $logs = get_option('aegis_day0_scan_logs', []);
+    $logs = get_option('aegis_day0_logs', []);
     
     // Paginación simple
     $per_page = 50;
@@ -175,6 +175,18 @@ function aegis_day0_logs_page() {
             </button>
         </form>
 
+        <!-- Botón Exportar Logs -->
+        <form method="post" action="<?php echo admin_url('admin-post.php'); ?>" style="margin-bottom: 20px; display: inline-block;">
+            <?php wp_nonce_field('aegis_export_logs_action'); ?>
+            <input type="hidden" name="action" value="aegis_export_logs">
+            <label for="export_format">Exportar:</label>
+            <select name="format" id="export_format" style="margin: 0 10px;">
+                <option value="csv">CSV</option>
+                <option value="json">JSON</option>
+            </select>
+            <button type="submit" class="button button-secondary">📥 Descargar Logs</button>
+        </form>
+
         <?php if (empty($logs)) : ?>
             <div class="notice notice-info"><p>ℹ️ No hay registros históricos disponibles.</p></div>
         <?php else : ?>
@@ -186,19 +198,19 @@ function aegis_day0_logs_page() {
                         <th style="width: 25%;">Tipo</th>
                         <th style="width: 10%;">Severidad</th>
                         <th style="width: 10%;">Fuente</th>
-                        <th style="width: 25%;">Detalle</th>
+                        <th style="width: 25%;">Acción</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ($paged_logs as $log) : ?>
                     <tr>
-                        <td><?php echo esc_html($log['timestamp']); ?></td>
+                        <td><?php echo esc_html($log['date']); ?></td>
                         <td><?php echo esc_html($log['plugin']); ?></td>
                         <td><?php echo esc_html($log['type']); ?></td>
                         <td><?php echo esc_html($log['severity']); ?></td>
                         <td><?php echo esc_html($log['source']); ?></td>
-                        <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="<?php echo esc_attr($log['detail']); ?>">
-                            <?php echo esc_html($log['detail']); ?>
+                        <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="<?php echo esc_attr($log['action']); ?>">
+                            <?php echo esc_html($log['action']); ?>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -293,3 +305,32 @@ function aegis_day0_wpscan_token_cb() {
     <p class="description">Obtén tu token gratuito en <a href="https://wpscan.com/" target="_blank" rel="noopener noreferrer">wpscan.com</a>. Necesario para consultar la base de datos de vulnerabilidades conocidas.</p>
     <?php
 }
+
+/**
+ * Maneja la exportación de logs
+ */
+function aegis_day0_handle_export_logs() {
+    if (!current_user_can('manage_options')) {
+        wp_die('No tienes permisos para realizar esta acción.');
+    }
+    
+    check_admin_referer('aegis_export_logs_action');
+    
+    $format = isset($_POST['format']) ? sanitize_text_field($_POST['format']) : 'csv';
+    $export = Aegis_Day0_Logger::export_logs($format);
+    
+    if (empty($export)) {
+        wp_die('No hay logs para exportar.');
+    }
+    
+    $filename = 'aegis-day0-logs-' . current_time('Y-m-d-H-i-s') . '.' . ($format === 'json' ? 'json' : 'csv');
+    
+    header('Content-Type: ' . ($format === 'json' ? 'application/json' : 'text/csv'));
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+    
+    echo $export;
+    exit;
+}
+add_action('admin_post_aegis_export_logs', 'aegis_day0_handle_export_logs');
