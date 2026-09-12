@@ -213,19 +213,40 @@ function aegis_day0_dashboard_page() {
         // Click en botón "Marcar como FP"
         $(document).on('click', '.mark-fp', function(e) {
             e.preventDefault();
+            
+            // Debug: Ver qué datos tenemos disponibles
+            var $btn = $(this);
+            console.log('Botón data attributes:', {
+                plugin: $btn.data('plugin'),
+                file: $btn.data('file'),
+                type: $btn.data('type'),
+                function: $btn.data('function'),
+                line: $btn.data('line'),
+                severity: $btn.data('severity'),
+                source: $btn.data('source')
+            });
+            
             currentAlert = {
-                plugin_file: $(this).data('plugin'),
-                file_path: $(this).data('file'),
-                issue_type: $(this).data('type'),
-                issue_function: $(this).data('function'),
-                issue_line: $(this).data('line'),
-                issue_severity: $(this).data('severity'),
-                issue_source: $(this).data('source')
+                plugin_file: $btn.data('plugin') || '',
+                file_path: $btn.data('file') || '',
+                issue_type: $btn.data('type') || 'generic',
+                issue_function: $btn.data('function') || '',
+                issue_line: $btn.data('line') || 0,
+                issue_severity: $btn.data('severity') || 'Unknown',
+                issue_source: $btn.data('source') || ''
             };
             
+            // Validar datos mínimos requeridos
+            if (!currentAlert.plugin_file || !currentAlert.file_path) {
+                alert('❌ Error: No se pudo identificar el plugin o archivo. Revisa la consola para más detalles.');
+                console.error('Datos incompletos para marcar como FP:', currentAlert);
+                return;
+            }
+            
             $('#aegis-fp-info').text(
-                'Plugin: ' + currentAlert.plugin_file + '\\n' +
-                'Tipo: ' + currentAlert.issue_type + '\\n' +
+                'Plugin: ' + currentAlert.plugin_file + '\n' +
+                'Archivo: ' + currentAlert.file_path + '\n' +
+                'Tipo: ' + currentAlert.issue_type + '\n' +
                 'Línea: ' + currentAlert.issue_line
             );
             $('#aegis-fp-modal').fadeIn();
