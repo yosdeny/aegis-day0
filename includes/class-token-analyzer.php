@@ -184,10 +184,14 @@ class Aegis_Token_Analyzer {
                 
                 // Generar alerta solo si es relevante
                 if ($adjusted_severity !== 'low' || $uses_user_input) {
+                    // Calcular ruta relativa desde WP_PLUGIN_DIR
+                    $relative_path = str_replace(WP_PLUGIN_DIR . '/', '', $file_path);
+                    
                     $alerts[] = [
                         'type' => 'token_analysis',
                         'function' => $function_name,
-                        'file' => $file_path,
+                        'file' => basename($file_path),
+                        'file_path' => $relative_path, // RUTA RELATIVA COMPLETA
                         'line' => $token_line,
                         'severity' => $adjusted_severity,
                         'false_positive_risk' => $false_positive_risk,

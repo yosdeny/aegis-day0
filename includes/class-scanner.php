@@ -82,16 +82,18 @@ class Aegis_Day0_Scanner {
             $issues = $this->static_scan($plugin_file);
             foreach ($issues as $issue) {
                 // Create unique key to prevent duplicate alerts
-                $alert_key = md5($plugin_name . '|' . $issue['type'] . '|' . $issue['severity']);
+                $alert_key = md5($plugin_name . '|' . $issue['type'] . '|' . $issue['severity'] . '|' . ($issue['file_path'] ?? ''));
                 
                 if (!isset($processed_alerts[$alert_key])) {
                     $processed_alerts[$alert_key] = true;
                     
                     $alerts[] = [
-                        'plugin'   => $plugin_name,
-                        'type'     => sanitize_text_field($issue['type']),
-                        'severity' => sanitize_text_field($issue['severity']),
-                        'source'   => 'Static Scan',
+                        'plugin'      => $plugin_name,
+                        'plugin_file' => $plugin_file, // RUTA COMPLETA DEL PLUGIN (ej: my-plugin/my-plugin.php)
+                        'file_path'   => $issue['file_path'] ?? '', // RUTA RELATIVA DEL ARCHIVO DENTRO DEL PLUGIN
+                        'type'        => sanitize_text_field($issue['type']),
+                        'severity'    => sanitize_text_field($issue['severity']),
+                        'source'      => 'Static Scan',
                         'false_positive_risk' => isset($issue['false_positive_risk']) ? $issue['false_positive_risk'] : 'unknown'
                     ];
                     
@@ -130,19 +132,21 @@ class Aegis_Day0_Scanner {
             if ($this->token_analyzer) {
                 $token_issues = $this->token_based_scan($plugin_file);
                 foreach ($token_issues as $issue) {
-                    $alert_key = md5($plugin_name . '|' . $issue['type'] . '|' . $issue['function'] . '|' . $issue['line']);
+                    $alert_key = md5($plugin_name . '|' . $issue['type'] . '|' . $issue['function'] . '|' . $issue['line'] . '|' . ($issue['file_path'] ?? ''));
                     
                     if (!isset($processed_alerts[$alert_key])) {
                         $processed_alerts[$alert_key] = true;
                         
                         $alerts[] = [
-                            'plugin'   => $plugin_name,
-                            'type'     => sanitize_text_field($issue['type']),
-                            'severity' => sanitize_text_field($issue['severity']),
-                            'source'   => 'Token Analysis',
+                            'plugin'      => $plugin_name,
+                            'plugin_file' => $plugin_file,
+                            'file_path'   => $issue['file_path'] ?? '',
+                            'type'        => sanitize_text_field($issue['type']),
+                            'severity'    => sanitize_text_field($issue['severity']),
+                            'source'      => 'Token Analysis',
                             'false_positive_risk' => isset($issue['false_positive_risk']) ? $issue['false_positive_risk'] : 'unknown',
-                            'function' => isset($issue['function']) ? $issue['function'] : '',
-                            'line' => isset($issue['line']) ? $issue['line'] : 0
+                            'function'    => isset($issue['function']) ? $issue['function'] : '',
+                            'line'        => isset($issue['line']) ? $issue['line'] : 0
                         ];
                         
                         // Track this detection
@@ -181,19 +185,21 @@ class Aegis_Day0_Scanner {
             if ($this->ast_analyzer) {
                 $ast_issues = $this->ast_based_scan($plugin_file);
                 foreach ($ast_issues as $issue) {
-                    $alert_key = md5($plugin_name . '|' . $issue['type'] . '|' . $issue['function'] . '|' . $issue['line'] . '|AST');
+                    $alert_key = md5($plugin_name . '|' . $issue['type'] . '|' . $issue['function'] . '|' . $issue['line'] . '|AST|' . ($issue['file_path'] ?? ''));
 
                     if (!isset($processed_alerts[$alert_key])) {
                         $processed_alerts[$alert_key] = true;
 
                         $alerts[] = [
-                            'plugin'   => $plugin_name,
-                            'type'     => sanitize_text_field($issue['type']),
-                            'severity' => sanitize_text_field($issue['severity']),
-                            'source'   => 'AST Analysis',
+                            'plugin'      => $plugin_name,
+                            'plugin_file' => $plugin_file,
+                            'file_path'   => $issue['file_path'] ?? '',
+                            'type'        => sanitize_text_field($issue['type']),
+                            'severity'    => sanitize_text_field($issue['severity']),
+                            'source'      => 'AST Analysis',
                             'false_positive_risk' => isset($issue['false_positive_risk']) ? $issue['false_positive_risk'] : 'unknown',
-                            'function' => isset($issue['function']) ? $issue['function'] : '',
-                            'line' => isset($issue['line']) ? $issue['line'] : 0
+                            'function'    => isset($issue['function']) ? $issue['function'] : '',
+                            'line'        => isset($issue['line']) ? $issue['line'] : 0
                         ];
 
                         // Track this detection
@@ -238,10 +244,12 @@ class Aegis_Day0_Scanner {
                     $processed_alerts[$alert_key] = true;
                     
                     $alerts[] = [
-                        'plugin'   => $plugin_name,
-                        'type'     => sanitize_text_field($issue['type']),
-                        'severity' => sanitize_text_field($issue['severity']),
-                        'source'   => 'WPScan'
+                        'plugin'      => $plugin_name,
+                        'plugin_file' => $plugin_file,
+                        'file_path'   => '', // WPScan no reporta archivos específicos
+                        'type'        => sanitize_text_field($issue['type']),
+                        'severity'    => sanitize_text_field($issue['severity']),
+                        'source'      => 'WPScan'
                     ];
                     
                     // Track this detection
@@ -433,6 +441,9 @@ class Aegis_Day0_Scanner {
             return $issues;
         }
 
+        // Calcular ruta relativa desde WP_PLUGIN_DIR para file_path
+        $relative_path = str_replace(WP_PLUGIN_DIR . '/', '', $file_path);
+
         foreach (Aegis_Day0_Rules::get_rules() as $rule) {
             if (@preg_match($rule['pattern'], $content, $matches, PREG_OFFSET_CAPTURE)) {
                 // Apply contextual filtering to reduce false positives
@@ -443,11 +454,12 @@ class Aegis_Day0_Scanner {
                 }
 
                 $issues[] = [
-                    'type'     => $rule['description'],
-                    'severity' => $rule['severity'],
+                    'type'       => $rule['description'],
+                    'severity'   => $rule['severity'],
                     'false_positive_risk' => isset($rule['false_positive_risk']) ? $rule['false_positive_risk'] : 'unknown',
-                    'file'     => basename($file_path),
-                    'line'     => $this->get_line_number($content, $matches[0][1])
+                    'file'       => basename($file_path),
+                    'file_path'  => $relative_path, // RUTA RELATIVA COMPLETA (ej: includes/class-something.php)
+                    'line'       => $this->get_line_number($content, $matches[0][1])
                 ];
             }
         }

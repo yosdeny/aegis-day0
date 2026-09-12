@@ -1,6 +1,6 @@
-```php
 # Compiled and build artifacts
 *.pyc
+__pycache__/
 *.o
 *.obj
 *.class
@@ -11,12 +11,9 @@
 *.out
 
 # Dependencies
-node_modules/
-venv/
 .venv/
-__pycache__/
-.mypy_cache/
-.pytest_cache/
+venv/
+node_modules/
 dist/
 build/
 target/
@@ -43,7 +40,9 @@ target/
 .DS_Store
 Thumbs.db
 
-# Coverage
+# Cache directories
+.mypy_cache/
+.pytest_cache/
 coverage/
 htmlcov/
 .coverage
@@ -71,4 +70,3 @@ htmlcov/
 *.tar.bz2
 *.tar.xz
 *.tar.zst
-```
