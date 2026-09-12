@@ -1,7 +1,1 @@
-```php
-<?php
-// There are no build artifacts, dependency directories, or temporary files in the changes
-// Only source/config files were modified: aegis-day0.php, readme.txt
-// Therefore, no .gitignore rules are needed
-?>
-```
+Nothing needs to be added to .gitignore since only a PHP source file (`includes/class-scanner.php`) was modified and no build artifacts, dependencies, or temporary files were detected in the changes.
