@@ -234,54 +234,94 @@ class Aegis_False_Positive_Manager {
      * @return array Alertas filtradas
      */
     public static function filter_alerts($alerts, $plugin_file) {
+        global $wpdb;
+        
+        if (empty($alerts)) {
+            return [];
+        }
+        
+        $table_name = $wpdb->prefix . self::TABLE_NAME;
         $filtered_alerts = [];
-        $files_with_new_errors = []; // Track files that have new error types
+        $files_with_new_errors = [];
         
-        // Primero, identificar qué archivos tienen nuevos tipos de errores
+        // Paso 1: Agrupar alertas por archivo y detectar cuáles tienen errores nuevos
+        $alerts_by_file = [];
+        
         foreach ($alerts as $alert) {
-            if (!isset($alert['file'])) {
-                continue;
-            }
+            // Soporte para diferentes nombres de claves
+            $file_path = isset($alert['file']) ? $alert['file'] : (isset($alert['file_path']) ? $alert['file_path'] : '');
             
-            $file_path = $alert['file'];
-            $issue_hash = self::generate_issue_hash($alert);
-            
-            // Obtener falsos positivos existentes para este archivo
-            $existing_fps = self::get_false_positives($plugin_file, $file_path);
-            $existing_hashes = wp_list_pluck($existing_fps, 'issue_hash');
-            
-            // Si este tipo de error NO está en los falsos positivos, es un error nuevo
-            if (!in_array($issue_hash, $existing_hashes)) {
-                // Marcar este archivo para limpiar sus falsos positivos
-                $files_with_new_errors[$plugin_file . '|' . $file_path] = true;
-            }
-        }
-        
-        // Limpiar falsos positivos de archivos con nuevos errores
-        foreach ($files_with_new_errors as $key => $value) {
-            list($p_file, $f_path) = explode('|', $key);
-            self::clear_file_false_positives($p_file, $f_path);
-        }
-        
-        // Ahora filtrar las alertas
-        foreach ($alerts as $alert) {
-            if (!isset($alert['file'])) {
-                // Si no tiene file, incluir la alerta
+            if (empty($file_path)) {
+                // Si no tiene file, incluir la alerta directamente
                 $filtered_alerts[] = $alert;
                 continue;
             }
             
-            $file_path = $alert['file'];
+            $key = $plugin_file . '|' . $file_path;
             
-            // Verificar si es falso positivo
-            if (self::is_false_positive($plugin_file, $file_path, $alert)) {
-                // Marcar como falso positivo en la alerta para UI
-                $alert['is_false_positive'] = true;
-                // No incluir en alertas activas
-                continue;
+            if (!isset($alerts_by_file[$key])) {
+                $alerts_by_file[$key] = [
+                    'plugin_file' => $plugin_file,
+                    'file_path' => $file_path,
+                    'alerts' => [],
+                    'hashes' => []
+                ];
             }
             
-            $filtered_alerts[] = $alert;
+            $issue_hash = self::generate_issue_hash($alert);
+            $alerts_by_file[$key]['alerts'][] = $alert;
+            $alerts_by_file[$key]['hashes'][] = $issue_hash;
+        }
+        
+        // Paso 2: Para cada archivo, verificar si hay errores nuevos (no marcados como FP)
+        foreach ($alerts_by_file as $key => $data) {
+            $p_file = $data['plugin_file'];
+            $f_path = $data['file_path'];
+            $current_hashes = $data['hashes'];
+            
+            // Obtener hashes de FPs guardados para este archivo
+            $existing_fps = self::get_false_positives($p_file, $f_path);
+            $known_fp_hashes = wp_list_pluck($existing_fps, 'issue_hash');
+            
+            // Detectar si hay ALGÚN error nuevo (no conocido como FP)
+            $has_new_error = false;
+            foreach ($current_hashes as $h) {
+                if (!in_array($h, $known_fp_hashes)) {
+                    $has_new_error = true;
+                    break;
+                }
+            }
+            
+            if ($has_new_error) {
+                // Hay un error nuevo en un archivo con FPs previos
+                // Regla: Limpiar TODOS los FPs de este archivo y re-reportar TODOS los errores
+                $files_with_new_errors[] = ['plugin_file' => $p_file, 'file_path' => $f_path];
+                
+                // Añadir todas las alertas de este archivo marcadas como NO-FP
+                foreach ($data['alerts'] as $alert) {
+                    $alert['is_false_positive'] = false;
+                    $filtered_alerts[] = $alert;
+                }
+            } else {
+                // No hay errores nuevos. Todos los errores actuales son FPs conocidos.
+                // Filtrar: ocultar los que están en la lista de FPs
+                foreach ($data['alerts'] as $alert) {
+                    $h = self::generate_issue_hash($alert);
+                    if (in_array($h, $known_fp_hashes)) {
+                        $alert['is_false_positive'] = true;
+                    } else {
+                        $alert['is_false_positive'] = false;
+                    }
+                    $filtered_alerts[] = $alert;
+                }
+            }
+        }
+        
+        // Paso 3: Ejecutar limpieza en BD si hubo nuevos errores
+        if (!empty($files_with_new_errors)) {
+            foreach ($files_with_new_errors as $file) {
+                self::clear_file_false_positives($file['plugin_file'], $file['file_path']);
+            }
         }
         
         return $filtered_alerts;
