@@ -174,7 +174,7 @@ function aegis_day0_dashboard_page() {
                             <td><?php echo esc_html($alert['source']); ?></td>
                             <td><?php echo $icon . ' ' . esc_html($fp_risk); ?></td>
                             <td>
-                                <?php if (!$is_fp && !empty($plugin_file) && !empty($file_path)) : ?>
+                                <?php if (!$is_fp && !empty($plugin_file)) : ?>
                                     <button class="button button-small mark-fp" 
                                             data-plugin="<?php echo esc_attr($plugin_file); ?>"
                                             data-file="<?php echo esc_attr($file_path); ?>"
@@ -188,7 +188,7 @@ function aegis_day0_dashboard_page() {
                                 <?php elseif ($is_fp) : ?>
                                     <span style="color: #666; font-style: italic;">Marcado como FP</span>
                                 <?php else : ?>
-                                    <span style="color: #999; font-size: 11px;">Sin datos de archivo</span>
+                                    <span style="color: #999; font-size: 11px;">Sin datos de plugin</span>
                                 <?php endif; ?>
                             </td>
                         </tr>
