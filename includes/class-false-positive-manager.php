@@ -397,14 +397,15 @@ class Aegis_False_Positive_Manager {
             return;
         }
         
-        $plugin_file = isset($_POST['plugin_file']) ? sanitize_text_field($_POST['plugin_file']) : '';
-        $file_path = isset($_POST['file_path']) ? sanitize_text_field($_POST['file_path']) : '';
-        $issue_type = isset($_POST['issue_type']) ? sanitize_text_field($_POST['issue_type']) : '';
-        $issue_function = isset($_POST['issue_function']) ? sanitize_text_field($_POST['issue_function']) : '';
+        // Obtener y validar datos - convertir null a string vacío antes de sanitizar
+        $plugin_file = isset($_POST['plugin_file']) ? sanitize_text_field((string) $_POST['plugin_file']) : '';
+        $file_path = isset($_POST['file_path']) ? sanitize_text_field((string) $_POST['file_path']) : '';
+        $issue_type = isset($_POST['issue_type']) ? sanitize_text_field((string) $_POST['issue_type']) : '';
+        $issue_function = isset($_POST['issue_function']) ? sanitize_text_field((string) $_POST['issue_function']) : '';
         $issue_line = isset($_POST['issue_line']) ? intval($_POST['issue_line']) : 0;
-        $issue_severity = isset($_POST['issue_severity']) ? sanitize_text_field($_POST['issue_severity']) : '';
-        $issue_source = isset($_POST['issue_source']) ? sanitize_text_field($_POST['issue_source']) : '';
-        $notes = isset($_POST['notes']) ? sanitize_textarea_field($_POST['notes']) : '';
+        $issue_severity = isset($_POST['issue_severity']) ? sanitize_text_field((string) $_POST['issue_severity']) : '';
+        $issue_source = isset($_POST['issue_source']) ? sanitize_text_field((string) $_POST['issue_source']) : '';
+        $notes = isset($_POST['notes']) ? sanitize_textarea_field((string) $_POST['notes']) : '';
         
         // Validar solo plugin_file (file_path es opcional para marcar todo el plugin)
         if (empty($plugin_file)) {
