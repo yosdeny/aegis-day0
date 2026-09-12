@@ -533,12 +533,30 @@ class Aegis_False_Positive_Manager {
             return false;
         }
         
-        // Crear snapshot serializable
+        // Normalizar datos para asegurar consistencia en la comparación
+        $normalized_data = [];
+        foreach ($fps as $fp) {
+            // Extraer solo los datos esenciales y asegurar tipo correcto
+            $normalized_data[] = [
+                'hash' => isset($fp['issue_hash']) ? (string)$fp['issue_hash'] : '',
+                'type' => isset($fp['issue_type']) ? (string)$fp['issue_type'] : '',
+                'file' => isset($fp['file_path']) ? (string)$fp['file_path'] : '',
+                'marked_at' => isset($fp['marked_at']) ? (string)$fp['marked_at'] : ''
+            ];
+        }
+        
+        // Ordenar para asegurar consistencia independientemente del orden de BD
+        usort($normalized_data, function($a, $b) {
+            return strcmp($a['hash'], $b['hash']);
+        });
+        
+        // Crear snapshot con hash MD5 para comparación rápida
         $snapshot = [
             'plugin_file' => $plugin_file,
-            'fps' => $fps,
-            'count' => count($fps),
-            'saved_at' => current_time('mysql')
+            'data_hash' => md5(json_encode($normalized_data)),
+            'count' => count($normalized_data),
+            'saved_at' => current_time('mysql'),
+            'raw_count' => count($normalized_data)
         ];
         
         update_option('aegis_day0_fp_snapshot_' . md5($plugin_file), $snapshot);
@@ -570,20 +588,40 @@ class Aegis_False_Positive_Manager {
         $current_count = count($current_fps);
         $old_count = isset($saved_snapshot['count']) ? $saved_snapshot['count'] : 0;
         
-        // Comparar hashes para detectar cambios reales
-        $saved_hashes = wp_list_pluck($saved_snapshot['fps'], 'issue_hash');
-        $current_hashes = wp_list_pluck($current_fps, 'issue_hash');
+        // Normalizar datos actuales para comparación
+        $normalized_current = [];
+        foreach ($current_fps as $fp) {
+            $normalized_current[] = [
+                'hash' => isset($fp['issue_hash']) ? (string)$fp['issue_hash'] : '',
+                'type' => isset($fp['issue_type']) ? (string)$fp['issue_type'] : '',
+                'file' => isset($fp['file_path']) ? (string)$fp['file_path'] : '',
+                'marked_at' => isset($fp['marked_at']) ? (string)$fp['marked_at'] : ''
+            ];
+        }
         
-        sort($saved_hashes);
-        sort($current_hashes);
+        usort($normalized_current, function($a, $b) {
+            return strcmp($a['hash'], $b['hash']);
+        });
         
-        $has_changes = ($saved_hashes !== $current_hashes);
+        // Calcular hash actual
+        $current_hash = md5(json_encode($normalized_current));
+        $saved_hash = isset($saved_snapshot['data_hash']) ? $saved_snapshot['data_hash'] : '';
+        
+        // Comparar hashes
+        $has_changes = ($current_hash !== $saved_hash);
+        
+        // Detección adicional: si el número total de alertas cambió drásticamente, forzar revisión
+        $total_alerts_changed = false;
+        if (isset($saved_snapshot['raw_count']) && abs($saved_snapshot['raw_count'] - $current_count) > 0) {
+            $total_alerts_changed = true;
+        }
         
         return [
-            'has_changes' => $has_changes,
+            'has_changes' => $has_changes || $total_alerts_changed,
             'new_count' => $current_count,
             'old_count' => $old_count,
-            'message' => $has_changes ? 'Cambios detectados' : 'Sin cambios'
+            'message' => ($has_changes || $total_alerts_changed) ? 'Cambios detectados' : 'Sin cambios',
+            'hash_match' => ($current_hash === $saved_hash)
         ];
     }
     

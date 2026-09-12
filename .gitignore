@@ -1,1 +1,1 @@
-Nothing should be ignored based on the provided file changes, as they only include PHP source files (.php) which are legitimate project files that should be tracked in version control.
+Nothing should be ignored based on the provided file changes. The only modified file is a PHP source file (`includes/class-false-positive-manager.php`), which is not a build artifact, dependency, or temporary file.
