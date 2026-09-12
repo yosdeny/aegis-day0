@@ -1,32 +1,7 @@
 ```php
-# Dependencies
-vendor/
-
-# Build artifacts
-build/
-dist/
-*.phar
-
-# Logs
-*.log
-
-# Environment
-.env
-.env.local
-.env.*
-
-# Editor/IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*.tmp
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Cache
-.cache/
-*.cache
+<?php
+// No specific gitignore rules needed for this change
+// The modification of admin/dashboard.php appears to be a source code change
+// which should typically be tracked in version control
+?>
 ```

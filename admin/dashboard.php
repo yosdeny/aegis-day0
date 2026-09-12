@@ -221,13 +221,13 @@ function aegis_day0_dashboard_page() {
             e.preventDefault();
             
             var $btn = $(this);
-            var pluginFile = $btn.data('plugin');
-            var filePath = $btn.data('file');
-            var issueType = $btn.data('type') || 'generic';
-            var issueFunction = $btn.data('function') || '';
-            var issueLine = $btn.data('line') || 0;
-            var issueSeverity = $btn.data('severity') || 'Unknown';
-            var issueSource = $btn.data('source') || '';
+            var pluginFile = $btn.attr('data-plugin');
+            var filePath = $btn.attr('data-file');
+            var issueType = $btn.attr('data-type') || 'generic';
+            var issueFunction = $btn.attr('data-function') || '';
+            var issueLine = $btn.attr('data-line') || 0;
+            var issueSeverity = $btn.attr('data-severity') || 'Unknown';
+            var issueSource = $btn.attr('data-source') || '';
             
             console.log('=== DATOS DEL BOTÓN ===');
             console.log('plugin:', pluginFile);
@@ -247,7 +247,7 @@ function aegis_day0_dashboard_page() {
             
             // Validar datos mínimos requeridos
             if (!currentAlert.plugin_file || !currentAlert.file_path) {
-                alert('❌ Error: No se pudo identificar el plugin o archivo.\n\nPlugin: "' + currentAlert.plugin_file.replace(/"/g, '\\"') + '"\nArchivo: "' + currentAlert.file_path.replace(/"/g, '\\"') + '"\n\nRevisa la consola (F12) para ver todos los datos disponibles.');
+                alert('❌ Error: No se pudo identificar el plugin o archivo.\n\nPlugin: "' + (currentAlert.plugin_file || 'VACÍO') + '"\nArchivo: "' + (currentAlert.file_path || 'VACÍO') + '"\n\nRevisa la consola (F12) para ver todos los datos disponibles.');
                 console.error('❌ Datos incompletos para marcar como FP:', currentAlert);
                 return;
             }
