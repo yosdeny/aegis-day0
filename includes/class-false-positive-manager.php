@@ -335,9 +335,16 @@ class Aegis_False_Positive_Manager {
         $issue_source = isset($_POST['issue_source']) ? sanitize_text_field($_POST['issue_source']) : '';
         $notes = isset($_POST['notes']) ? sanitize_textarea_field($_POST['notes']) : '';
         
-        if (empty($plugin_file) || empty($file_path) || empty($issue_type)) {
-            wp_send_json_error(['message' => __('Datos incompletos', 'aegis-day0')]);
+        // Validar solo los campos requeridos esenciales (plugin_file y file_path)
+        // issue_type puede ser derivado o tener valores por defecto
+        if (empty($plugin_file) || empty($file_path)) {
+            wp_send_json_error(['message' => __('Datos incompletos: faltan plugin o archivo', 'aegis-day0')]);
             return;
+        }
+        
+        // Si issue_type está vacío, usar un valor por defecto
+        if (empty($issue_type)) {
+            $issue_type = 'generic';
         }
         
         $issue = [
