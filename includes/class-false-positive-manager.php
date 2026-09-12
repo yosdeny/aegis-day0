@@ -520,7 +520,7 @@ class Aegis_False_Positive_Manager {
     
     /**
      * Guarda el snapshot actual de falsos positivos para un plugin
-     * Optimizado para manejar grandes volúmenes de alertas (ej. muchos 'Low') sin exceder límites de DB.
+     * Lógica simple: Guardar solo la lista ordenada de issue_hashes de los FPs.
      * 
      * @param string $plugin_file Archivo del plugin
      * @return bool True si éxito, False si falla
@@ -528,77 +528,29 @@ class Aegis_False_Positive_Manager {
     public static function save_fp_snapshot($plugin_file) {
         global $wpdb;
         
-        // 1. Obtener todos los FPs actuales para este plugin (solo columnas necesarias)
+        // 1. Obtener solo los hashes de los FPs actuales para este plugin
         $table_name = $wpdb->prefix . self::TABLE_NAME;
-        $fps = $wpdb->get_results($wpdb->prepare(
-            "SELECT issue_hash, issue_type, file_path, marked_at 
-             FROM $table_name 
-             WHERE plugin_file = %s",
+        $fps = $wpdb->get_col($wpdb->prepare(
+            "SELECT issue_hash FROM $table_name WHERE plugin_file = %s ORDER BY issue_hash",
             $plugin_file
-        ), ARRAY_A);
+        ));
 
+        // 2. Guardar directamente el array de hashes (serializado por WP)
+        $option_name = 'aegis_day0_fp_log_' . md5($plugin_file);
+        
+        // Si está vacío, guardamos array vacío para indicar "revisado y limpio"
         if (empty($fps)) {
-            // Si no hay FPs, guardamos un array vacío explícito
-            $data_to_save = [];
-        } else {
-            // 2. Normalizar datos estrictamente para evitar problemas de serialización y reducir tamaño
-            // Usamos claves cortas para minimizar el tamaño del JSON
-            $normalized = [];
-            foreach ($fps as $fp) {
-                $normalized[] = [
-                    'h' => isset($fp['issue_hash']) ? (string)$fp['issue_hash'] : '',
-                    't' => isset($fp['issue_type']) ? (string)$fp['issue_type'] : '',
-                    'f' => isset($fp['file_path']) ? (string)$fp['file_path'] : '',
-                    'm' => isset($fp['marked_at']) ? strtotime($fp['marked_at']) : 0
-                ];
-            }
-            
-            // Ordenar para garantizar consistencia independientemente del orden de la DB
-            usort($normalized, function($a, $b) {
-                return strcmp(
-                    $a['h'] . $a['t'] . $a['f'] . $a['m'],
-                    $b['h'] . $b['t'] . $b['f'] . $b['m']
-                );
-            });
-
-            $data_to_save = $normalized;
+            $fps = [];
         }
 
-        // 3. Generar JSON compacto
-        $json_data = json_encode($data_to_save, JSON_UNESCAPED_SLASHES);
-        
-        if ($json_data === false) {
-            error_log('[AEGIS] Error al codificar JSON para snapshot de ' . $plugin_file . ': ' . json_last_error_msg());
-            return false;
-        }
-
-        $option_name = 'aegis_day0_fp_snapshot_' . md5($plugin_file);
-        
-        // 4. Intentar guardar en wp_options
-        // update_option devuelve false si falla, true si se actualizó, null si no hubo cambios (pero es exitoso)
-        $result = update_option($option_name, $json_data, 'no'); // 'no' para no autoload y ahorrar memoria
-        
-        if ($result === false) {
-            // Posible causa: valor demasiado grande para wp_options (límite ~4MB)
-            // Fallback: Guardar como transient (puede usar object cache o archivos)
-            error_log('[AEGIS] Fallo al guardar snapshot en BD para ' . $plugin_file . '. Intentando fallback a transient...');
-            set_transient($option_name, $json_data, WEEK_IN_SECONDS);
-            
-            // Verificamos si el transient se guardó correctamente
-            $verify = get_transient($option_name);
-            if ($verify === false && !empty($data_to_save)) {
-                error_log('[AEGIS] Fallo crítico: No se pudo guardar el snapshot ni en BD ni en Transient para ' . $plugin_file);
-                return false;
-            }
-            // Si está vacío y falla, lo consideramos éxito (caso borde)
-            return true; // Éxito vía transient o caso vacío
-        }
+        update_option($option_name, $fps, 'no');
 
         return true;
     }
     
     /**
-     * Compara el snapshot guardado con el estado actual de FPs
+     * Compara el log guardado con el estado actual de FPs
+     * Lógica simple: Comparar dos arrays de hashes. Si son iguales, no hay cambios.
      * 
      * @param string $plugin_file Archivo del plugin
      * @return array ['has_changes' => bool, 'new_count' => int, 'old_count' => int]
@@ -606,66 +558,43 @@ class Aegis_False_Positive_Manager {
     public static function compare_fp_snapshot($plugin_file) {
         global $wpdb;
         
-        $option_name = 'aegis_day0_fp_snapshot_' . md5($plugin_file);
-        $saved_snapshot = get_option($option_name);
+        $option_name = 'aegis_day0_fp_log_' . md5($plugin_file);
+        $saved_log = get_option($option_name);
         
-        // Si no hay en wp_options, intentar con transient
-        if (!$saved_snapshot) {
-            $saved_snapshot = get_transient($option_name);
-        }
-        
-        // Si no hay snapshot guardado, es la primera vez
-        if (!$saved_snapshot) {
+        // Si no hay log guardado, es la primera vez -> hay cambios (todo es nuevo)
+        if ($saved_log === false) {
             return [
                 'has_changes' => true,
                 'new_count' => 0,
                 'old_count' => 0,
-                'message' => 'Sin historial previo'
+                'message' => 'Sin historial previo - Primera revisión requerida'
             ];
         }
         
-        // Obtener estado actual directamente de la BD
-        $table_name = $wpdb->prefix . self::TABLE_NAME;
-        $current_fps = $wpdb->get_results($wpdb->prepare(
-            "SELECT issue_hash, issue_type, file_path, marked_at 
-             FROM $table_name 
-             WHERE plugin_file = %s",
-            $plugin_file
-        ), ARRAY_A);
-        
-        $current_count = is_array($current_fps) ? count($current_fps) : 0;
-        
-        // Normalizar datos actuales para comparación (mismo formato que save_fp_snapshot)
-        $normalized_current = [];
-        if (!empty($current_fps)) {
-            foreach ($current_fps as $fp) {
-                $normalized_current[] = [
-                    'h' => isset($fp['issue_hash']) ? (string)$fp['issue_hash'] : '',
-                    't' => isset($fp['issue_type']) ? (string)$fp['issue_type'] : '',
-                    'f' => isset($fp['file_path']) ? (string)$fp['file_path'] : '',
-                    'm' => isset($fp['marked_at']) ? strtotime($fp['marked_at']) : 0
-                ];
-            }
-            
-            usort($normalized_current, function($a, $b) {
-                return strcmp(
-                    $a['h'] . $a['t'] . $a['f'] . $a['m'],
-                    $b['h'] . $b['t'] . $b['f'] . $b['m']
-                );
-            });
+        // Asegurar que sea un array
+        if (!is_array($saved_log)) {
+            $saved_log = [];
         }
         
-        // Calcular hash actual
-        $current_hash = md5(json_encode($normalized_current, JSON_UNESCAPED_SLASHES));
-        $saved_hash = $saved_snapshot; // El snapshot ahora es solo el hash JSON
+        // Obtener estado actual directamente de la BD (solo hashes)
+        $table_name = $wpdb->prefix . self::TABLE_NAME;
+        $current_log = $wpdb->get_col($wpdb->prepare(
+            "SELECT issue_hash FROM $table_name WHERE plugin_file = %s ORDER BY issue_hash",
+            $plugin_file
+        ));
         
-        // Comparar hashes
-        $has_changes = ($current_hash !== $saved_hash);
+        if (!is_array($current_log)) {
+            $current_log = [];
+        }
+        
+        // Comparación directa de arrays ordenados
+        // Como ambos vienen ordenados por SQL, una comparación simple basta
+        $has_changes = ($saved_log !== $current_log);
         
         return [
             'has_changes' => $has_changes,
-            'new_count' => $current_count,
-            'old_count' => isset($saved_snapshot['count']) ? $saved_snapshot['count'] : $current_count,
+            'new_count' => count($current_log),
+            'old_count' => count($saved_log),
             'message' => $has_changes ? 'Cambios detectados - Nueva revisión requerida' : 'Sin cambios - Todo revisado',
             'hash_match' => !$has_changes
         ];
@@ -677,7 +606,7 @@ class Aegis_False_Positive_Manager {
      * @param string $plugin_file Archivo del plugin
      */
     public static function clear_fp_snapshot($plugin_file) {
-        delete_option('aegis_day0_fp_snapshot_' . md5($plugin_file));
+        delete_option('aegis_day0_fp_log_' . md5($plugin_file));
     }
 }
 
