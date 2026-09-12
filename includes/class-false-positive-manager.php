@@ -520,46 +520,80 @@ class Aegis_False_Positive_Manager {
     
     /**
      * Guarda el snapshot actual de falsos positivos para un plugin
-     * Esto se usa para comparar con futuros escaneos y detectar cambios
+     * Optimizado para manejar grandes volúmenes de alertas (ej. muchos 'Low') sin exceder límites de DB.
      * 
      * @param string $plugin_file Archivo del plugin
      * @return bool True si éxito, False si falla
      */
     public static function save_fp_snapshot($plugin_file) {
-        $fps = self::get_false_positives($plugin_file, null);
+        global $wpdb;
         
+        // 1. Obtener todos los FPs actuales para este plugin (solo columnas necesarias)
+        $table_name = $wpdb->prefix . self::TABLE_NAME;
+        $fps = $wpdb->get_results($wpdb->prepare(
+            "SELECT issue_hash, issue_type, file_path, marked_at 
+             FROM $table_name 
+             WHERE plugin_file = %s",
+            $plugin_file
+        ), ARRAY_A);
+
         if (empty($fps)) {
-            delete_option('aegis_day0_fp_snapshot_' . md5($plugin_file));
+            // Si no hay FPs, guardamos un array vacío explícito
+            $data_to_save = [];
+        } else {
+            // 2. Normalizar datos estrictamente para evitar problemas de serialización y reducir tamaño
+            // Usamos claves cortas para minimizar el tamaño del JSON
+            $normalized = [];
+            foreach ($fps as $fp) {
+                $normalized[] = [
+                    'h' => isset($fp['issue_hash']) ? (string)$fp['issue_hash'] : '',
+                    't' => isset($fp['issue_type']) ? (string)$fp['issue_type'] : '',
+                    'f' => isset($fp['file_path']) ? (string)$fp['file_path'] : '',
+                    'm' => isset($fp['marked_at']) ? strtotime($fp['marked_at']) : 0
+                ];
+            }
+            
+            // Ordenar para garantizar consistencia independientemente del orden de la DB
+            usort($normalized, function($a, $b) {
+                return strcmp(
+                    $a['h'] . $a['t'] . $a['f'] . $a['m'],
+                    $b['h'] . $b['t'] . $b['f'] . $b['m']
+                );
+            });
+
+            $data_to_save = $normalized;
+        }
+
+        // 3. Generar JSON compacto
+        $json_data = json_encode($data_to_save, JSON_UNESCAPED_SLASHES);
+        
+        if ($json_data === false) {
+            error_log('[AEGIS] Error al codificar JSON para snapshot de ' . $plugin_file . ': ' . json_last_error_msg());
             return false;
         }
+
+        $option_name = 'aegis_day0_fp_snapshot_' . md5($plugin_file);
         
-        // Normalizar datos para asegurar consistencia en la comparación
-        $normalized_data = [];
-        foreach ($fps as $fp) {
-            // Extraer solo los datos esenciales y asegurar tipo correcto
-            $normalized_data[] = [
-                'hash' => isset($fp['issue_hash']) ? (string)$fp['issue_hash'] : '',
-                'type' => isset($fp['issue_type']) ? (string)$fp['issue_type'] : '',
-                'file' => isset($fp['file_path']) ? (string)$fp['file_path'] : '',
-                'marked_at' => isset($fp['marked_at']) ? (string)$fp['marked_at'] : ''
-            ];
+        // 4. Intentar guardar en wp_options
+        // update_option devuelve false si falla, true si se actualizó, null si no hubo cambios (pero es exitoso)
+        $result = update_option($option_name, $json_data, 'no'); // 'no' para no autoload y ahorrar memoria
+        
+        if ($result === false) {
+            // Posible causa: valor demasiado grande para wp_options (límite ~4MB)
+            // Fallback: Guardar como transient (puede usar object cache o archivos)
+            error_log('[AEGIS] Fallo al guardar snapshot en BD para ' . $plugin_file . '. Intentando fallback a transient...');
+            set_transient($option_name, $json_data, WEEK_IN_SECONDS);
+            
+            // Verificamos si el transient se guardó correctamente
+            $verify = get_transient($option_name);
+            if ($verify === false && !empty($data_to_save)) {
+                error_log('[AEGIS] Fallo crítico: No se pudo guardar el snapshot ni en BD ni en Transient para ' . $plugin_file);
+                return false;
+            }
+            // Si está vacío y falla, lo consideramos éxito (caso borde)
+            return true; // Éxito vía transient o caso vacío
         }
-        
-        // Ordenar para asegurar consistencia independientemente del orden de BD
-        usort($normalized_data, function($a, $b) {
-            return strcmp($a['hash'], $b['hash']);
-        });
-        
-        // Crear snapshot con hash MD5 para comparación rápida
-        $snapshot = [
-            'plugin_file' => $plugin_file,
-            'data_hash' => md5(json_encode($normalized_data)),
-            'count' => count($normalized_data),
-            'saved_at' => current_time('mysql'),
-            'raw_count' => count($normalized_data)
-        ];
-        
-        update_option('aegis_day0_fp_snapshot_' . md5($plugin_file), $snapshot);
+
         return true;
     }
     
@@ -570,8 +604,15 @@ class Aegis_False_Positive_Manager {
      * @return array ['has_changes' => bool, 'new_count' => int, 'old_count' => int]
      */
     public static function compare_fp_snapshot($plugin_file) {
+        global $wpdb;
+        
         $option_name = 'aegis_day0_fp_snapshot_' . md5($plugin_file);
         $saved_snapshot = get_option($option_name);
+        
+        // Si no hay en wp_options, intentar con transient
+        if (!$saved_snapshot) {
+            $saved_snapshot = get_transient($option_name);
+        }
         
         // Si no hay snapshot guardado, es la primera vez
         if (!$saved_snapshot) {
@@ -583,45 +624,50 @@ class Aegis_False_Positive_Manager {
             ];
         }
         
-        // Obtener estado actual
-        $current_fps = self::get_false_positives($plugin_file, null);
-        $current_count = count($current_fps);
-        $old_count = isset($saved_snapshot['count']) ? $saved_snapshot['count'] : 0;
+        // Obtener estado actual directamente de la BD
+        $table_name = $wpdb->prefix . self::TABLE_NAME;
+        $current_fps = $wpdb->get_results($wpdb->prepare(
+            "SELECT issue_hash, issue_type, file_path, marked_at 
+             FROM $table_name 
+             WHERE plugin_file = %s",
+            $plugin_file
+        ), ARRAY_A);
         
-        // Normalizar datos actuales para comparación
+        $current_count = is_array($current_fps) ? count($current_fps) : 0;
+        
+        // Normalizar datos actuales para comparación (mismo formato que save_fp_snapshot)
         $normalized_current = [];
-        foreach ($current_fps as $fp) {
-            $normalized_current[] = [
-                'hash' => isset($fp['issue_hash']) ? (string)$fp['issue_hash'] : '',
-                'type' => isset($fp['issue_type']) ? (string)$fp['issue_type'] : '',
-                'file' => isset($fp['file_path']) ? (string)$fp['file_path'] : '',
-                'marked_at' => isset($fp['marked_at']) ? (string)$fp['marked_at'] : ''
-            ];
+        if (!empty($current_fps)) {
+            foreach ($current_fps as $fp) {
+                $normalized_current[] = [
+                    'h' => isset($fp['issue_hash']) ? (string)$fp['issue_hash'] : '',
+                    't' => isset($fp['issue_type']) ? (string)$fp['issue_type'] : '',
+                    'f' => isset($fp['file_path']) ? (string)$fp['file_path'] : '',
+                    'm' => isset($fp['marked_at']) ? strtotime($fp['marked_at']) : 0
+                ];
+            }
+            
+            usort($normalized_current, function($a, $b) {
+                return strcmp(
+                    $a['h'] . $a['t'] . $a['f'] . $a['m'],
+                    $b['h'] . $b['t'] . $b['f'] . $b['m']
+                );
+            });
         }
         
-        usort($normalized_current, function($a, $b) {
-            return strcmp($a['hash'], $b['hash']);
-        });
-        
         // Calcular hash actual
-        $current_hash = md5(json_encode($normalized_current));
-        $saved_hash = isset($saved_snapshot['data_hash']) ? $saved_snapshot['data_hash'] : '';
+        $current_hash = md5(json_encode($normalized_current, JSON_UNESCAPED_SLASHES));
+        $saved_hash = $saved_snapshot; // El snapshot ahora es solo el hash JSON
         
         // Comparar hashes
         $has_changes = ($current_hash !== $saved_hash);
         
-        // Detección adicional: si el número total de alertas cambió drásticamente, forzar revisión
-        $total_alerts_changed = false;
-        if (isset($saved_snapshot['raw_count']) && abs($saved_snapshot['raw_count'] - $current_count) > 0) {
-            $total_alerts_changed = true;
-        }
-        
         return [
-            'has_changes' => $has_changes || $total_alerts_changed,
+            'has_changes' => $has_changes,
             'new_count' => $current_count,
-            'old_count' => $old_count,
-            'message' => ($has_changes || $total_alerts_changed) ? 'Cambios detectados' : 'Sin cambios',
-            'hash_match' => ($current_hash === $saved_hash)
+            'old_count' => isset($saved_snapshot['count']) ? $saved_snapshot['count'] : $current_count,
+            'message' => $has_changes ? 'Cambios detectados - Nueva revisión requerida' : 'Sin cambios - Todo revisado',
+            'hash_match' => !$has_changes
         ];
     }
     
