@@ -346,11 +346,13 @@ class Aegis_False_Positive_Manager {
             }
         }
         
-        // Paso 3: Ejecutar limpieza en BD si hubo nuevos errores
+        // Paso 3: Ejecutar limpieza en BD si hubo nuevos errores y guardar snapshot actualizado
         if (!empty($files_with_new_errors)) {
             foreach ($files_with_new_errors as $file) {
                 self::clear_file_false_positives($file['plugin_file'], $file['file_path']);
             }
+            // Guardar nuevo snapshot después de limpiar
+            self::save_fp_snapshot($plugin_file);
         }
         
         return $filtered_alerts;
@@ -435,6 +437,9 @@ class Aegis_False_Positive_Manager {
             return;
         }
         
+        // Guardar snapshot actualizado después de marcar FP
+        self::save_fp_snapshot($plugin_file);
+        
         wp_send_json_success(['message' => __('Reporte marcado como falso positivo', 'aegis-day0')]);
     }
     
@@ -461,6 +466,19 @@ class Aegis_False_Positive_Manager {
         if (is_wp_error($result)) {
             wp_send_json_error(['message' => $result->get_error_message()]);
             return;
+        }
+        
+        // Obtener el plugin_file para actualizar el snapshot
+        global $wpdb;
+        $table_name = $wpdb->prefix . self::TABLE_NAME;
+        $plugin_file = $wpdb->get_var($wpdb->prepare(
+            "SELECT plugin_file FROM $table_name WHERE id = %d",
+            $fp_id
+        ));
+        
+        // Actualizar snapshot si tenemos el plugin_file
+        if ($plugin_file) {
+            self::save_fp_snapshot($plugin_file);
         }
         
         wp_send_json_success(['message' => __('Falso positivo removido', 'aegis-day0')]);
@@ -498,6 +516,84 @@ class Aegis_False_Positive_Manager {
             'by_plugin' => $by_plugin,
             'recent' => $recent
         ];
+    }
+    
+    /**
+     * Guarda el snapshot actual de falsos positivos para un plugin
+     * Esto se usa para comparar con futuros escaneos y detectar cambios
+     * 
+     * @param string $plugin_file Archivo del plugin
+     * @return bool True si éxito, False si falla
+     */
+    public static function save_fp_snapshot($plugin_file) {
+        $fps = self::get_false_positives($plugin_file, null);
+        
+        if (empty($fps)) {
+            delete_option('aegis_day0_fp_snapshot_' . md5($plugin_file));
+            return false;
+        }
+        
+        // Crear snapshot serializable
+        $snapshot = [
+            'plugin_file' => $plugin_file,
+            'fps' => $fps,
+            'count' => count($fps),
+            'saved_at' => current_time('mysql')
+        ];
+        
+        update_option('aegis_day0_fp_snapshot_' . md5($plugin_file), $snapshot);
+        return true;
+    }
+    
+    /**
+     * Compara el snapshot guardado con el estado actual de FPs
+     * 
+     * @param string $plugin_file Archivo del plugin
+     * @return array ['has_changes' => bool, 'new_count' => int, 'old_count' => int]
+     */
+    public static function compare_fp_snapshot($plugin_file) {
+        $option_name = 'aegis_day0_fp_snapshot_' . md5($plugin_file);
+        $saved_snapshot = get_option($option_name);
+        
+        // Si no hay snapshot guardado, es la primera vez
+        if (!$saved_snapshot) {
+            return [
+                'has_changes' => true,
+                'new_count' => 0,
+                'old_count' => 0,
+                'message' => 'Sin historial previo'
+            ];
+        }
+        
+        // Obtener estado actual
+        $current_fps = self::get_false_positives($plugin_file, null);
+        $current_count = count($current_fps);
+        $old_count = isset($saved_snapshot['count']) ? $saved_snapshot['count'] : 0;
+        
+        // Comparar hashes para detectar cambios reales
+        $saved_hashes = wp_list_pluck($saved_snapshot['fps'], 'issue_hash');
+        $current_hashes = wp_list_pluck($current_fps, 'issue_hash');
+        
+        sort($saved_hashes);
+        sort($current_hashes);
+        
+        $has_changes = ($saved_hashes !== $current_hashes);
+        
+        return [
+            'has_changes' => $has_changes,
+            'new_count' => $current_count,
+            'old_count' => $old_count,
+            'message' => $has_changes ? 'Cambios detectados' : 'Sin cambios'
+        ];
+    }
+    
+    /**
+     * Limpia el snapshot guardado para un plugin
+     * 
+     * @param string $plugin_file Archivo del plugin
+     */
+    public static function clear_fp_snapshot($plugin_file) {
+        delete_option('aegis_day0_fp_snapshot_' . md5($plugin_file));
     }
 }
 
