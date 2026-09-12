@@ -109,6 +109,15 @@ add_action('admin_init', 'aegis_day0_handle_clean_scan');
  */
 function aegis_day0_dashboard_page() {
     $alerts = get_option('aegis_day0_alerts', []);
+    
+    // Aplicar filtro de falsos positivos si la clase existe
+    if (class_exists('Aegis_False_Positive_Manager')) {
+        // Obtener el plugin file desde el contexto (usamos el primero como referencia)
+        $plugin_file = !empty($alerts) && isset($alerts[0]['plugin']) ? $alerts[0]['plugin'] : '';
+        if ($plugin_file) {
+            $alerts = apply_filters('aegis_day0_filter_alerts', $alerts, $plugin_file);
+        }
+    }
     ?>
     <div class="wrap aegis-day0-dashboard">
         <h1 style="margin-bottom: 20px;">🛡️ Dashboard de Seguridad</h1>
@@ -140,10 +149,11 @@ function aegis_day0_dashboard_page() {
                     <thead>
                         <tr>
                             <th style="width: 20%;">Plugin</th>
-                            <th style="width: 35%;">Tipo</th>
+                            <th style="width: 30%;">Tipo</th>
                             <th style="width: 10%;">Severidad</th>
                             <th style="width: 15%;">Fuente</th>
-                            <th style="width: 20%;">Riesgo Falso Positivo</th>
+                            <th style="width: 15%;">Riesgo Falso Positivo</th>
+                            <th style="width: 10%;">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -151,13 +161,30 @@ function aegis_day0_dashboard_page() {
                             $fp_risk = isset($alert['false_positive_risk']) ? $alert['false_positive_risk'] : 'Desconocido';
                             $icon = ($fp_risk === 'Alto') ? '⚠️' : (($fp_risk === 'Medio') ? '◐' : '✅');
                             $severity_color = ($alert['severity'] === 'Critical') ? 'red' : 'orange';
+                            $is_fp = isset($alert['is_false_positive']) && $alert['is_false_positive'];
                         ?>
-                        <tr>
+                        <tr<?php echo $is_fp ? ' style="background-color: #f0f0f1; opacity: 0.7;"' : ''; ?>>
                             <td><strong><?php echo esc_html($alert['plugin']); ?></strong></td>
                             <td><?php echo esc_html($alert['type']); ?></td>
                             <td><span style="color: <?php echo $severity_color; ?>; font-weight: bold;"><?php echo esc_html($alert['severity']); ?></span></td>
                             <td><?php echo esc_html($alert['source']); ?></td>
                             <td><?php echo $icon . ' ' . esc_html($fp_risk); ?></td>
+                            <td>
+                                <?php if (!$is_fp) : ?>
+                                    <button class="button button-small mark-fp" 
+                                            data-plugin="<?php echo esc_attr($alert['plugin']); ?>"
+                                            data-file="<?php echo esc_attr(isset($alert['file']) ? $alert['file'] : ''); ?>"
+                                            data-type="<?php echo esc_attr($alert['type']); ?>"
+                                            data-function="<?php echo esc_attr(isset($alert['function']) ? $alert['function'] : ''); ?>"
+                                            data-line="<?php echo esc_attr(isset($alert['line']) ? $alert['line'] : 0); ?>"
+                                            data-severity="<?php echo esc_attr($alert['severity']); ?>"
+                                            data-source="<?php echo esc_attr($alert['source']); ?>">
+                                        🚫 Marcar como FP
+                                    </button>
+                                <?php else : ?>
+                                    <span style="color: #666; font-style: italic;">Marcado como FP</span>
+                                <?php endif; ?>
+                            </td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -165,6 +192,101 @@ function aegis_day0_dashboard_page() {
             </div>
         <?php endif; ?>
     </div>
+    
+    <!-- Modal para marcar como falso positivo -->
+    <div id="aegis-fp-modal" style="display:none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999999;">
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #fff; padding: 30px; border-radius: 5px; max-width: 500px; width: 90%;">
+            <h3 style="margin-top: 0;">🚫 Marcar como Falso Positivo</h3>
+            <p id="aegis-fp-info" style="color: #666; margin-bottom: 20px;"></p>
+            <textarea id="aegis-fp-notes" placeholder="Notas opcionales: ¿Por qué es un falso positivo?" style="width: 100%; height: 100px; margin-bottom: 15px;"></textarea>
+            <div style="text-align: right;">
+                <button id="aegis-fp-cancel" class="button">Cancelar</button>
+                <button id="aegis-fp-confirm" class="button button-primary">Confirmar</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    jQuery(document).ready(function($) {
+        var currentAlert = null;
+        
+        // Click en botón "Marcar como FP"
+        $(document).on('click', '.mark-fp', function(e) {
+            e.preventDefault();
+            currentAlert = {
+                plugin_file: $(this).data('plugin'),
+                file_path: $(this).data('file'),
+                issue_type: $(this).data('type'),
+                issue_function: $(this).data('function'),
+                issue_line: $(this).data('line'),
+                issue_severity: $(this).data('severity'),
+                issue_source: $(this).data('source')
+            };
+            
+            $('#aegis-fp-info').text(
+                'Plugin: ' + currentAlert.plugin_file + '\\n' +
+                'Tipo: ' + currentAlert.issue_type + '\\n' +
+                'Línea: ' + currentAlert.issue_line
+            );
+            $('#aegis-fp-modal').fadeIn();
+        });
+        
+        // Cancelar
+        $('#aegis-fp-cancel').click(function() {
+            $('#aegis-fp-modal').fadeOut();
+            $('#aegis-fp-notes').val('');
+            currentAlert = null;
+        });
+        
+        // Confirmar
+        $('#aegis-fp-confirm').click(function() {
+            if (!currentAlert) return;
+            
+            var notes = $('#aegis-fp-notes').val();
+            
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: {
+                    action: 'aegis_mark_false_positive',
+                    nonce: '<?php echo wp_create_nonce('aegis_day0_nonce'); ?>',
+                    plugin_file: currentAlert.plugin_file,
+                    file_path: currentAlert.file_path,
+                    issue_type: currentAlert.issue_type,
+                    issue_function: currentAlert.issue_function,
+                    issue_line: currentAlert.issue_line,
+                    issue_severity: currentAlert.issue_severity,
+                    issue_source: currentAlert.issue_source,
+                    notes: notes
+                },
+                success: function(response) {
+                    if (response.success) {
+                        alert('✅ ' + response.data.message);
+                        location.reload();
+                    } else {
+                        alert('❌ Error: ' + response.data.message);
+                    }
+                },
+                error: function() {
+                    alert('❌ Error de conexión');
+                }
+            });
+            
+            $('#aegis-fp-modal').fadeOut();
+            $('#aegis-fp-notes').val('');
+            currentAlert = null;
+        });
+        
+        // Cerrar modal al hacer click fuera
+        $('#aegis-fp-modal').click(function(e) {
+            if ($(e.target).is('#aegis-fp-modal')) {
+                $('#aegis-fp-modal').fadeOut();
+                $('#aegis-fp-notes').val('');
+                currentAlert = null;
+            }
+        });
+    });
+    </script>
     <?php
 }
 

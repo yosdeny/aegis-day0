@@ -11,6 +11,13 @@ delete_option('aegis_day0_report_recipients');
 delete_option('aegis_day0_wpscan_token');
 delete_option('aegis_day0_alerts');
 delete_option('aegis_day0_logs');
+delete_option('aegis_day0_notified_alerts');
+delete_option('aegis_day0_fp_db_version');
+
+// Drop the false positives table
+global $wpdb;
+$table_name = $wpdb->prefix . 'aegis_day0_false_positives';
+$wpdb->query("DROP TABLE IF EXISTS $table_name");
 
 // Clear scheduled events
 wp_clear_scheduled_hook('aegis_day0_send_report');
