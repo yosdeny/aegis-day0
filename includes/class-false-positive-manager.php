@@ -77,12 +77,13 @@ class Aegis_False_Positive_Manager {
      * @return string Hash del reporte
      */
     public static function generate_issue_hash($issue) {
+        // Normalizar todos los valores para asegurar consistencia en el hash
         $hash_data = [
-            'type' => isset($issue['type']) ? $issue['type'] : '',
-            'function' => isset($issue['function']) ? $issue['function'] : '',
-            'line' => isset($issue['line']) ? $issue['line'] : 0,
-            'severity' => isset($issue['severity']) ? $issue['severity'] : '',
-            'source' => isset($issue['source']) ? $issue['source'] : ''
+            'type' => isset($issue['type']) ? strtolower(trim($issue['type'])) : '',
+            'function' => isset($issue['function']) ? trim($issue['function']) : '',
+            'line' => isset($issue['line']) ? intval($issue['line']) : 0,
+            'severity' => isset($issue['severity']) ? strtolower(trim($issue['severity'])) : '',
+            'source' => isset($issue['source']) ? trim($issue['source']) : ''
         ];
         
         return md5(serialize($hash_data));
@@ -421,6 +422,16 @@ class Aegis_False_Positive_Manager {
         // Si issue_type está vacío, usar un valor por defecto
         if (empty($issue_type)) {
             $issue_type = 'generic';
+        }
+        
+        // Normalizar severity para consistencia (importante para el hash)
+        if (!empty($issue_severity)) {
+            $issue_severity = strtolower(trim($issue_severity));
+        }
+        
+        // Normalizar type para consistencia
+        if (!empty($issue_type)) {
+            $issue_type = strtolower(trim($issue_type));
         }
         
         $issue = [
