@@ -32,6 +32,7 @@ require_once AEGIS_DAY0_PLUGIN_DIR . 'includes/api-wpscan.php';
 require_once AEGIS_DAY0_PLUGIN_DIR . 'includes/notify.php';
 require_once AEGIS_DAY0_PLUGIN_DIR . 'includes/logger.php';
 require_once AEGIS_DAY0_PLUGIN_DIR . 'includes/reports.php';
+require_once AEGIS_DAY0_PLUGIN_DIR . 'includes/class-false-positive-manager.php';
 require_once AEGIS_DAY0_PLUGIN_DIR . 'admin/dashboard.php';
 
 // Enqueue admin styles
@@ -205,6 +206,11 @@ function aegis_day0_activate() {
     add_option('aegis_day0_alerts', []);
     add_option('aegis_day0_logs', []);
     add_option('aegis_day0_notified_alerts', []);
+    
+    // Crear tabla de falsos positivos
+    if (class_exists('Aegis_False_Positive_Manager')) {
+        Aegis_False_Positive_Manager::maybe_create_table();
+    }
     
     // Schedule initial report
     aegis_day0_schedule_reports();
