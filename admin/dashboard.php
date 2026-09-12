@@ -177,7 +177,6 @@ function aegis_day0_dashboard_page() {
                                 <?php if (!$is_fp && !empty($plugin_file)) : ?>
                                     <button class="button button-small mark-fp" 
                                             data-plugin="<?php echo esc_attr($plugin_file); ?>"
-                                            data-file="<?php echo esc_attr($file_path); ?>"
                                             data-type="<?php echo esc_attr($alert['type']); ?>"
                                             data-function="<?php echo esc_attr(isset($alert['function']) ? $alert['function'] : ''); ?>"
                                             data-line="<?php echo esc_attr(isset($alert['line']) ? $alert['line'] : 0); ?>"
@@ -222,7 +221,7 @@ function aegis_day0_dashboard_page() {
             
             var $btn = $(this);
             var pluginFile = $btn.attr('data-plugin');
-            var filePath = $btn.attr('data-file');
+            // Ya no se usa data-file porque puede haber múltiples archivos
             var issueType = $btn.attr('data-type') || 'generic';
             var issueFunction = $btn.attr('data-function') || '';
             var issueLine = $btn.attr('data-line') || 0;
@@ -231,13 +230,12 @@ function aegis_day0_dashboard_page() {
             
             console.log('=== DATOS DEL BOTÓN ===');
             console.log('plugin:', pluginFile);
-            console.log('file:', filePath);
             console.log('type:', issueType);
             console.log('Todos los data attributes:', $btn.data());
             
             currentAlert = {
                 plugin_file: pluginFile,
-                file_path: filePath,
+                file_path: null, // Se establecerá null porque ya no viene del botón
                 issue_type: issueType,
                 issue_function: issueFunction,
                 issue_line: issueLine,
@@ -245,16 +243,22 @@ function aegis_day0_dashboard_page() {
                 issue_source: issueSource
             };
             
-            // Validar datos mínimos requeridos
-            if (!currentAlert.plugin_file || !currentAlert.file_path) {
-                alert('❌ Error: No se pudo identificar el plugin o archivo.\n\nPlugin: "' + (currentAlert.plugin_file || 'VACÍO') + '"\nArchivo: "' + (currentAlert.file_path || 'VACÍO') + '"\n\nRevisa la consola (F12) para ver todos los datos disponibles.');
+            // Validar datos mínimos requeridos - solo necesitamos el plugin_file
+            if (!currentAlert.plugin_file) {
+                alert('❌ Error: No se pudo identificar el plugin.\n\nPlugin: "' + (currentAlert.plugin_file || 'VACÍO') + '"\n\nRevisa la consola (F12) para ver todos los datos disponibles.');
                 console.error('❌ Datos incompletos para marcar como FP:', currentAlert);
                 return;
             }
             
+            // Si no hay file_path, es porque puede haber múltiples archivos o aún no se ha determinado
+            // Esto es normal y permitimos continuar solo con el plugin_file
+            if (!currentAlert.file_path) {
+                console.log('⚠️ Nota: No hay file_path específico, se marcará todo el plugin como FP');
+            }
+            
             $('#aegis-fp-info').text(
                 'Plugin: ' + currentAlert.plugin_file + '\n' +
-                'Archivo: ' + currentAlert.file_path + '\n' +
+                (currentAlert.file_path ? 'Archivo: ' + currentAlert.file_path + '\n' : '') +
                 'Tipo: ' + currentAlert.issue_type + '\n' +
                 'Línea: ' + currentAlert.issue_line
             );
