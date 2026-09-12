@@ -247,7 +247,7 @@ function aegis_day0_dashboard_page() {
             
             // Validar datos mínimos requeridos
             if (!currentAlert.plugin_file || !currentAlert.file_path) {
-                alert('❌ Error: No se pudo identificar el plugin o archivo.\n\nPlugin: "' + currentAlert.plugin_file + '"\nArchivo: "' + currentAlert.file_path + '"\n\nRevisa la consola (F12) para ver todos los datos disponibles.');
+                alert('❌ Error: No se pudo identificar el plugin o archivo.\n\nPlugin: "' + currentAlert.plugin_file.replace(/"/g, '\\"') + '"\nArchivo: "' + currentAlert.file_path.replace(/"/g, '\\"') + '"\n\nRevisa la consola (F12) para ver todos los datos disponibles.');
                 console.error('❌ Datos incompletos para marcar como FP:', currentAlert);
                 return;
             }
