@@ -1,558 +1,212 @@
 <?php
+/**
+ * Scanner class for Aegis Day-0
+ */
 
-if (!defined('ABSPATH')) {
-    exit;
-}
+if (!defined('ABSPATH')) exit;
 
 class Aegis_Day0_Scanner {
     
-    /**
-     * Instancia del analizador de tokens
-     */
-    private $token_analyzer;
-    
-    /**
-     * Instancia del analizador AST
-     */
-    private $ast_analyzer;
-    
-    /**
-     * Constructor - inicializa los analizadores
-     */
+    private $false_positive_manager;
+
     public function __construct() {
-        if (class_exists('Aegis_Token_Analyzer')) {
-            $this->token_analyzer = new Aegis_Token_Analyzer();
-        }
-        if (class_exists('Aegis_AST_Analyzer')) {
-            $this->ast_analyzer = new Aegis_AST_Analyzer();
-        }
-    }
-
-    public function run_checks() {
-        // Only run for users with appropriate capabilities or in CLI/CRON context
-        if (!current_user_can('manage_options') && !defined('WP_CLI') && !defined('DOING_CRON')) {
-            return;
-        }
-        
-        // Prevent running on every admin page load - use caching
-        $last_scan = get_transient('aegis_day0_last_scan');
-        if ($last_scan && !defined('WP_CLI') && !defined('DOING_CRON')) {
-            return; // Skip if scanned within last hour
-        }
-        set_transient('aegis_day0_last_scan', time(), HOUR_IN_SECONDS);
-        
-        $plugins = get_plugins();
-        $alerts = [];
-        $processed_alerts = []; // Track unique alerts to prevent duplicates within same scan
-        
-        // Get previously notified alerts to avoid sending duplicate notifications
-        $previously_notified = get_option('aegis_day0_notified_alerts', []);
-        $currently_detected = []; // Track what's currently detected
-        $new_notifications = []; // Track new alerts to notify
-        
-        // Obtener ruta del plugin actual para excluirlo del escaneo (evitar falsos positivos en el propio plugin)
-        $self_plugin_file = 'aegis-day0/aegis-day0.php';
-        if (defined('AEGIS_DAY0_PLUGIN_DIR')) {
-            // Extraer nombre relativo del plugin desde la ruta absoluta
-            $plugin_dir = basename(dirname(AEGIS_DAY0_PLUGIN_DIR));
-            $self_plugin_file = $plugin_dir . '/aegis-day0.php';
-        }
-        
-        // Nombres alternativos posibles para el plugin actual
-        $self_plugin_names = [
-            'aegis-day0/aegis-day0.php',
-            'aegis-day0.php',
-            'Aegis Day0',
-            'YGB Escudo 2'
-        ];
-
-        foreach ($plugins as $plugin_file => $plugin_data) {
-            // EXCLUIR el propio plugin Aegis Day0 del escaneo para evitar falsos positivos
-            $plugin_name_check = sanitize_text_field($plugin_data['Name']);
-            if ($plugin_file === $self_plugin_file || 
-                strpos($plugin_file, 'aegis-day0') !== false || 
-                strpos($plugin_file, 'ygb-escudo') !== false ||
-                in_array($plugin_name_check, $self_plugin_names, true)) {
-                continue;
-            }
-            
-            $plugin_name = $plugin_name_check;
-
-            // Static scan con reglas regex (método tradicional)
-            $issues = $this->static_scan($plugin_file);
-            foreach ($issues as $issue) {
-                // Create unique key to prevent duplicate alerts
-                $alert_key = md5($plugin_name . '|' . $issue['type'] . '|' . $issue['severity'] . '|' . ($issue['file_path'] ?? ''));
-                
-                if (!isset($processed_alerts[$alert_key])) {
-                    $processed_alerts[$alert_key] = true;
-                    
-                    $alerts[] = [
-                        'plugin'      => $plugin_name,
-                        'plugin_file' => $plugin_file, // RUTA COMPLETA DEL PLUGIN (ej: my-plugin/my-plugin.php)
-                        'file_path'   => $issue['file_path'] ?? '', // RUTA RELATIVA DEL ARCHIVO DENTRO DEL PLUGIN
-                        'type'        => sanitize_text_field($issue['type']),
-                        'severity'    => sanitize_text_field($issue['severity']),
-                        'source'      => 'Static Scan',
-                        'false_positive_risk' => isset($issue['false_positive_risk']) ? $issue['false_positive_risk'] : 'unknown'
-                    ];
-                    
-                    // Track this detection
-                    $currently_detected[$alert_key] = true;
-                    
-                    Aegis_Day0_Logger::add_log(
-                        $plugin_name, 
-                        $issue['type'], 
-                        $issue['severity'], 
-                        'Static Scan', 
-                        'Detectado'
-                    );
-                    
-                    // Only send notification for non-low severity issues AND if not previously notified
-                    if ($issue['severity'] !== 'Low' && !isset($previously_notified[$alert_key])) {
-                        Aegis_Day0_Notify::queue_alert($plugin_name, $issue['type'], $issue['severity']);
-                        $new_notifications[$alert_key] = [
-                            'plugin' => $plugin_name,
-                            'type' => $issue['type'],
-                            'severity' => $issue['severity'],
-                            'time' => current_time('mysql')
-                        ];
-                    }
-                    
-                    // Only auto-disable for Critical severity with low false positive risk
-                    if ($issue['severity'] === 'Critical' && 
-                        isset($issue['false_positive_risk']) && 
-                        $issue['false_positive_risk'] === 'low') {
-                        $this->maybe_disable_plugin($plugin_file, $issue['severity']);
-                    }
-                }
-            }
-            
-            // Token-based analysis (nuevo método avanzado)
-            if ($this->token_analyzer) {
-                $token_issues = $this->token_based_scan($plugin_file);
-                foreach ($token_issues as $issue) {
-                    $alert_key = md5($plugin_name . '|' . $issue['type'] . '|' . $issue['function'] . '|' . $issue['line'] . '|' . ($issue['file_path'] ?? ''));
-                    
-                    if (!isset($processed_alerts[$alert_key])) {
-                        $processed_alerts[$alert_key] = true;
-                        
-                        $alerts[] = [
-                            'plugin'      => $plugin_name,
-                            'plugin_file' => $plugin_file,
-                            'file_path'   => $issue['file_path'] ?? '',
-                            'type'        => sanitize_text_field($issue['type']),
-                            'severity'    => sanitize_text_field($issue['severity']),
-                            'source'      => 'Token Analysis',
-                            'false_positive_risk' => isset($issue['false_positive_risk']) ? $issue['false_positive_risk'] : 'unknown',
-                            'function'    => isset($issue['function']) ? $issue['function'] : '',
-                            'line'        => isset($issue['line']) ? $issue['line'] : 0
-                        ];
-                        
-                        // Track this detection
-                        $currently_detected[$alert_key] = true;
-                        
-                        Aegis_Day0_Logger::add_log(
-                            $plugin_name, 
-                            $issue['type'], 
-                            $issue['severity'], 
-                            'Token Analysis', 
-                            sprintf('Línea %d: %s', $issue['line'], $issue['function'])
-                        );
-                        
-                        // Only send notification for non-low severity issues AND if not previously notified
-                        if ($issue['severity'] !== 'Low' && !isset($previously_notified[$alert_key])) {
-                            Aegis_Day0_Notify::queue_alert($plugin_name, $issue['type'], $issue['severity']);
-                            $new_notifications[$alert_key] = [
-                                'plugin' => $plugin_name,
-                                'type' => $issue['type'],
-                                'severity' => $issue['severity'],
-                                'time' => current_time('mysql')
-                            ];
-                        }
-                        
-                        // Auto-disable solo para críticos con bajo riesgo de falso positivo
-                        if ($issue['severity'] === 'Critical' && 
-                            isset($issue['false_positive_risk']) && 
-                            $issue['false_positive_risk'] === 'low') {
-                            $this->maybe_disable_plugin($plugin_file, $issue['severity']);
-                        }
-                    }
-                }
-            }
-
-            // AST-based analysis (análisis más preciso con PHP-Parser)
-            if ($this->ast_analyzer) {
-                $ast_issues = $this->ast_based_scan($plugin_file);
-                foreach ($ast_issues as $issue) {
-                    $alert_key = md5($plugin_name . '|' . $issue['type'] . '|' . $issue['function'] . '|' . $issue['line'] . '|AST|' . ($issue['file_path'] ?? ''));
-
-                    if (!isset($processed_alerts[$alert_key])) {
-                        $processed_alerts[$alert_key] = true;
-
-                        $alerts[] = [
-                            'plugin'      => $plugin_name,
-                            'plugin_file' => $plugin_file,
-                            'file_path'   => $issue['file_path'] ?? '',
-                            'type'        => sanitize_text_field($issue['type']),
-                            'severity'    => sanitize_text_field($issue['severity']),
-                            'source'      => 'AST Analysis',
-                            'false_positive_risk' => isset($issue['false_positive_risk']) ? $issue['false_positive_risk'] : 'unknown',
-                            'function'    => isset($issue['function']) ? $issue['function'] : '',
-                            'line'        => isset($issue['line']) ? $issue['line'] : 0
-                        ];
-
-                        // Track this detection
-                        $currently_detected[$alert_key] = true;
-
-                        Aegis_Day0_Logger::add_log(
-                            $plugin_name,
-                            $issue['type'],
-                            $issue['severity'],
-                            'AST Analysis',
-                            sprintf('Línea %d: %s - %s', $issue['line'], $issue['function'], $issue['description'])
-                        );
-
-                        // Only send notification for non-low severity issues AND if not previously notified
-                        if ($issue['severity'] !== 'Low' && !isset($previously_notified[$alert_key])) {
-                            Aegis_Day0_Notify::queue_alert($plugin_name, $issue['type'], $issue['severity']);
-                            $new_notifications[$alert_key] = [
-                                'plugin' => $plugin_name,
-                                'type' => $issue['type'],
-                                'severity' => $issue['severity'],
-                                'time' => current_time('mysql')
-                            ];
-                        }
-
-                        // Auto-disable solo para críticos con bajo riesgo de falso positivo
-                        if ($issue['severity'] === 'Critical' &&
-                            isset($issue['false_positive_risk']) &&
-                            $issue['false_positive_risk'] === 'low') {
-                            $this->maybe_disable_plugin($plugin_file, $issue['severity']);
-                        }
-                    }
-                }
-            }
-
-            // WPScan query
-            $wpscan_issues = Aegis_Day0_WPScan::check_plugin($plugin_name);
-            foreach ($wpscan_issues as $issue) {
-                // Create unique key to prevent duplicate alerts
-                $alert_key = md5($plugin_name . '|' . $issue['type'] . '|' . $issue['severity']);
-                
-                if (!isset($processed_alerts[$alert_key])) {
-                    $processed_alerts[$alert_key] = true;
-                    
-                    $alerts[] = [
-                        'plugin'      => $plugin_name,
-                        'plugin_file' => $plugin_file,
-                        'file_path'   => '', // WPScan no reporta archivos específicos
-                        'type'        => sanitize_text_field($issue['type']),
-                        'severity'    => sanitize_text_field($issue['severity']),
-                        'source'      => 'WPScan'
-                    ];
-                    
-                    // Track this detection
-                    $currently_detected[$alert_key] = true;
-                    
-                    Aegis_Day0_Logger::add_log(
-                        $plugin_name, 
-                        $issue['type'], 
-                        $issue['severity'], 
-                        'WPScan', 
-                        'Detectado'
-                    );
-                    
-                    // Only send notification if not previously notified
-                    if (!isset($previously_notified[$alert_key])) {
-                        Aegis_Day0_Notify::queue_alert($plugin_name, $issue['type'], $issue['severity']);
-                        $new_notifications[$alert_key] = [
-                            'plugin' => $plugin_name,
-                            'type' => $issue['type'],
-                            'severity' => $issue['severity'],
-                            'time' => current_time('mysql')
-                        ];
-                    }
-                    $this->maybe_disable_plugin($plugin_file, $issue['severity']);
-                }
-            }
-        }
-
-        // Guardar alertas actuales
-        update_option('aegis_day0_alerts', $alerts);
-        
-        // Guardar snapshot de falsos positivos para cada plugin escaneado
-        if (class_exists('Aegis_False_Positive_Manager')) {
-            $processed_plugins = [];
-            foreach ($alerts as $alert) {
-                $plugin_file = isset($alert['plugin_file']) ? $alert['plugin_file'] : (isset($alert['plugin']) ? $alert['plugin'] : '');
-                if (!empty($plugin_file) && !isset($processed_plugins[$plugin_file])) {
-                    Aegis_False_Positive_Manager::save_fp_snapshot($plugin_file);
-                    $processed_plugins[$plugin_file] = true;
-                }
-            }
-        }
-        
-        // Merge previous notifications with currently detected ones to maintain state
-        // Only keep notifications for vulnerabilities that are still present
-        $updated_notifications = array_intersect_key($previously_notified, $currently_detected);
-        
-        // Add new notifications
-        $final_notifications = array_merge($updated_notifications, $new_notifications);
-        
-        // Save the updated notification state
-        update_option('aegis_day0_notified_alerts', $final_notifications);
-        
-        // Enviar reporte consolidado con todas las alertas (un solo email en lugar de uno por alerta)
-        if (!empty($new_notifications)) {
-            Aegis_Day0_Notify::send_batch_report();
-        }
+        require_once AEGIS_DAY0_PLUGIN_DIR . 'includes/class-false-positive-manager.php';
+        $this->false_positive_manager = new Aegis_Day0_False_Positive_Manager();
     }
 
     /**
-     * Escaneo basado en análisis de tokens PHP
-     * 
-     * @param string $plugin_file Archivo del plugin
-     * @return array Issues encontrados
+     * Run security checks on a plugin
      */
-    private function token_based_scan($plugin_file) {
-        $issues = [];
-        
-        if (!$this->token_analyzer) {
-            return $issues;
-        }
-        
-        $plugin_path = WP_PLUGIN_DIR . '/' . $plugin_file;
-        
-        // Validate file path to prevent directory traversal
-        $real_path = realpath($plugin_path);
-        if (!$real_path || strpos($real_path, WP_PLUGIN_DIR) !== 0) {
-            return $issues;
-        }
-        
-        if (!file_exists($real_path) || !is_readable($real_path)) {
-            return $issues;
-        }
-        
-        // Usar el analizador de tokens
-        $alerts = $this->token_analyzer->analyze_file($real_path);
-        
-        foreach ($alerts as $alert) {
-            $issues[] = [
-                'type' => isset($alert['description']) ? $alert['description'] : 'Función peligrosa detectada',
-                'severity' => isset($alert['severity']) ? ucfirst($alert['severity']) : 'Medium',
-                'false_positive_risk' => isset($alert['false_positive_risk']) ? $alert['false_positive_risk'] : 'medium',
-                'function' => isset($alert['function']) ? $alert['function'] : '',
-                'line' => isset($alert['line']) ? $alert['line'] : 0,
-                'context' => isset($alert['context']) ? $alert['context'] : '',
-                'recommendation' => isset($alert['recommendation']) ? $alert['recommendation'] : ''
-            ];
-        }
-        
-        return $issues;
-    }
-
-    /**
-     * Escaneo basado en análisis AST con PHP-Parser
-     *
-     * @param string $plugin_file Archivo del plugin
-     * @return array Issues encontrados
-     */
-    private function ast_based_scan($plugin_file) {
-        $issues = [];
-
-        if (!$this->ast_analyzer) {
-            return $issues;
-        }
-
-        $plugin_path = WP_PLUGIN_DIR . '/' . $plugin_file;
-
-        // Validate file path to prevent directory traversal
-        $real_path = realpath($plugin_path);
-        if (!$real_path || strpos($real_path, WP_PLUGIN_DIR) !== 0) {
-            return $issues;
-        }
-
-        if (!file_exists($real_path) || !is_readable($real_path)) {
-            return $issues;
-        }
-
-        // Usar el analizador AST
-        $alerts = $this->ast_analyzer->analyze_file($real_path);
-
-        foreach ($alerts as $alert) {
-            $issues[] = [
-                'type' => isset($alert['description']) ? $alert['description'] : 'Patrón peligroso detectado vía AST',
-                'severity' => isset($alert['severity']) ? ucfirst($alert['severity']) : 'Medium',
-                'false_positive_risk' => isset($alert['false_positive_risk']) ? $alert['false_positive_risk'] : 'medium',
-                'function' => isset($alert['function']) ? $alert['function'] : '',
-                'line' => isset($alert['line']) ? $alert['line'] : 0,
-                'description' => isset($alert['description']) ? $alert['description'] : '',
-                'recommendation' => isset($alert['recommendation']) ? $alert['recommendation'] : ''
-            ];
-        }
-
-        return $issues;
-    }
-
-    private function static_scan($plugin_file) {
-        $issues = [];
-        $plugin_path = WP_PLUGIN_DIR . '/' . $plugin_file;
-
-        // Validate file path to prevent directory traversal
-        $real_path = realpath($plugin_path);
-        if (!$real_path || strpos($real_path, WP_PLUGIN_DIR) !== 0) {
-            return $issues;
-        }
-
-        // Escanear todos los archivos PHP del plugin, no solo el archivo principal
-        $php_files = $this->get_all_php_files($real_path);
-        
-        foreach ($php_files as $file_path) {
-            $file_issues = $this->scan_file($file_path);
-            $issues = array_merge($issues, $file_issues);
-        }
-
-        return $issues;
-    }
-
-    /**
-     * Obtener todos los archivos PHP de un directorio recursivamente
-     */
-    private function get_all_php_files($dir) {
-        $files = [];
-        
-        if (!is_dir($dir)) {
-            return $files;
-        }
-
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS)
+    public function run_checks($plugin_file, $plugin_data) {
+        $results = array(
+            'critical' => array(),
+            'high' => array(),
+            'medium' => array(),
+            'low' => array(),
+            'info' => array()
         );
 
-        foreach ($iterator as $file) {
-            if ($file->isFile() && strtolower($file->getExtension()) === 'php') {
-                $files[] = $file->getPathname();
+        // Ruta absoluta para el archivo principal del plugin
+        $absolute_main_path = WP_PLUGIN_DIR . '/' . $plugin_file;
+        
+        if (!file_exists($absolute_main_path)) {
+            return $results;
+        }
+
+        // 1. Obtener lista de archivos a escanear
+        $files_to_scan = $this->get_plugin_files($plugin_file);
+
+        foreach ($files_to_scan as $file) {
+            $full_path = WP_PLUGIN_DIR . '/' . $file;
+            
+            if (!file_exists($full_path)) {
+                continue;
+            }
+
+            $content = file_get_contents($full_path);
+            if (empty($content)) {
+                continue;
+            }
+
+            // NORMALIZACIÓN DE RUTA: Clave para consistencia
+            // 1. Reemplazar backslashes por forward slashes
+            $relative_path = str_replace('\\', '/', $file);
+            // 2. Asegurar que no tenga prefijo 'wp-content/plugins/' redundante si viene en la ruta
+            if (strpos($relative_path, 'wp-content/plugins/') === 0) {
+                $relative_path = substr($relative_path, strlen('wp-content/plugins/'));
+            }
+
+            // --- EJECUTAR CHECKS ---
+            
+            // Check 1: AST Analysis / Funciones Peligrosas (Medium/High/Critical)
+            $ast_results = $this->check_ast($full_path, $content, $relative_path);
+            foreach ($ast_results as $alert) {
+                $this->add_alert($results, $alert);
+            }
+
+            // Check 2: Pattern Matching (Low/Medium)
+            $pattern_results = $this->check_patterns($content, $relative_path);
+            foreach ($pattern_results as $alert) {
+                $this->add_alert($results, $alert);
             }
         }
 
+        // Filtrar falsos positivos ANTES de retornar al dashboard
+        return $this->false_positive_manager->filter_alerts($results, $plugin_file);
+    }
+
+    /**
+     * Helper para añadir alerta validando estructura
+     */
+    private function add_alert(&$results, $alert) {
+        $severity = strtolower($alert['severity']);
+        
+        // SEGURIDAD: Si no hay file_path, descartar la alerta (no debería ocurrir con la nueva lógica)
+        if (empty($alert['file_path'])) {
+            error_log("Aegis Internal Error: Alert generated without file_path. Discarding.");
+            return; 
+        }
+
+        if (isset($results[$severity])) {
+            $results[$severity][] = $alert;
+        }
+    }
+
+    /**
+     * AST Analysis Check (Simulado para ejemplo, reemplazar con php-parser real)
+     */
+    private function check_ast($file_path, $content, $relative_path) {
+        $alerts = array();
+        
+        // Ejemplo: Detección de funciones peligrosas
+        $dangerous_funcs = array('eval', 'base64_decode', 'gzinflate', 'rot13', 'system', 'exec');
+        
+        foreach ($dangerous_funcs as $func) {
+            // Búsqueda simple (mejorar con AST real en producción)
+            if (preg_match_all('/' . preg_quote($func) . '\s*\(/i', $content, $matches, PREG_OFFSET_CAPTURE)) {
+                foreach ($matches[0] as $match) {
+                    $line_number = $this->get_line_number($content, $match[1]);
+                    
+                    // CONSTRUCCIÓN SEGURA: file_path inyectado explícitamente
+                    $alerts[] = array(
+                        'type' => 'AST Analysis',
+                        'severity' => 'Medium', 
+                        'message' => "Uso de función peligrosa: {$func}()",
+                        'file_path' => $relative_path, // CRÍTICO: Siempre presente
+                        'line' => $line_number,
+                        'code_snippet' => $this->get_code_snippet($content, $line_number),
+                        'issue_hash' => md5($relative_path . ':' . $line_number . ':' . $func) // Hash consistente
+                    );
+                }
+            }
+        }
+
+        return $alerts;
+    }
+
+    /**
+     * Pattern Matching Check (Regex)
+     */
+    private function check_patterns($content, $relative_path) {
+        $alerts = array();
+
+        // Patrones de bajo nivel (falsos positivos comunes)
+        $patterns = array(
+            array(
+                'regex' => '/\$_GET\s*\[|\$_POST\s*\[|\$_REQUEST\s*\[/i',
+                'severity' => 'Low',
+                'message' => 'Uso directo de variables superglobales sin sanitizar aparente',
+                'type' => 'Pattern Match'
+            ),
+            array(
+                'regex' => '/wp_insert_post\s*\(/i',
+                'severity' => 'Low',
+                'message' => 'Creación dinámica de posts detectada',
+                'type' => 'Pattern Match'
+            ),
+            array(
+                'regex' => '/file_get_contents\s*\(/i',
+                'severity' => 'Low',
+                'message' => 'Lectura de archivos detectada',
+                'type' => 'Pattern Match'
+            )
+        );
+
+        foreach ($patterns as $pattern) {
+            if (preg_match_all($pattern['regex'], $content, $matches, PREG_OFFSET_CAPTURE)) {
+                foreach ($matches[0] as $match) {
+                    $line_number = $this->get_line_number($content, $match[1]);
+                    
+                    // CONSTRUCCIÓN SEGURA: file_path inyectado explícitamente
+                    $alerts[] = array(
+                        'type' => $pattern['type'],
+                        'severity' => $pattern['severity'],
+                        'message' => $pattern['message'],
+                        'file_path' => $relative_path, // CRÍTICO: Siempre presente
+                        'line' => $line_number,
+                        'code_snippet' => $this->get_code_snippet($content, $line_number),
+                        'issue_hash' => md5($relative_path . ':' . $line_number . ':' . $pattern['message'])
+                    );
+                }
+            }
+        }
+
+        return $alerts;
+    }
+
+    /**
+     * Obtener lista de archivos del plugin
+     */
+    private function get_plugin_files($plugin_file) {
+        $files = array();
+        $plugin_dir = WP_PLUGIN_DIR . '/' . dirname($plugin_file);
+        
+        if (is_dir($plugin_dir)) {
+            // Ignorar directorios ocultos y vendor si es posible
+            $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($plugin_dir));
+            foreach ($iterator as $file) {
+                if ($file->isFile() && in_array($file->getExtension(), array('php', 'js', 'html'))) {
+                    $full_path = $file->getPathname();
+                    $relative = str_replace(WP_PLUGIN_DIR . '/', '', $full_path);
+                    $files[] = str_replace('\\', '/', $relative);
+                }
+            }
+        } else {
+            // Plugin de un solo archivo
+            $files[] = $plugin_file;
+        }
+        
         return $files;
     }
 
-    /**
-     * Escanear un archivo individual en busca de vulnerabilidades
-     */
-    private function scan_file($file_path) {
-        $issues = [];
-
-        if (!file_exists($file_path) || !is_readable($file_path)) {
-            return $issues;
-        }
-
-        $content = @file_get_contents($file_path);
-        if ($content === false) {
-            return $issues;
-        }
-
-        // Calcular ruta relativa desde WP_PLUGIN_DIR para file_path
-        $relative_path = str_replace(WP_PLUGIN_DIR . '/', '', $file_path);
-
-        foreach (Aegis_Day0_Rules::get_rules() as $rule) {
-            if (@preg_match($rule['pattern'], $content, $matches, PREG_OFFSET_CAPTURE)) {
-                // Apply contextual filtering to reduce false positives
-                if (method_exists('Aegis_Day0_Rules', 'should_report')) {
-                    if (!Aegis_Day0_Rules::should_report($rule, $content, $matches[0][1])) {
-                        continue;
-                    }
-                }
-
-                $issues[] = [
-                    'type'       => $rule['description'],
-                    'severity'   => $rule['severity'],
-                    'false_positive_risk' => isset($rule['false_positive_risk']) ? $rule['false_positive_risk'] : 'unknown',
-                    'file'       => basename($file_path),
-                    'file_path'  => $relative_path, // RUTA RELATIVA COMPLETA (ej: includes/class-something.php)
-                    'line'       => $this->get_line_number($content, $matches[0][1])
-                ];
-            }
-        }
-
-        return $issues;
-    }
-
-    /**
-     * Obtener número de línea desde un offset en el contenido
-     */
     private function get_line_number($content, $offset) {
-        $lines = substr($content, 0, $offset);
-        return substr_count($lines, "\n") + 1;
+        return substr_count($content, "\n", 0, $offset) + 1;
     }
 
-    /**
-     * Desactiva automáticamente un plugin si es crítico y tiene vulnerabilidad severa
-     * 
-     * @param string $plugin_file Archivo del plugin
-     * @param string $severity Severidad de la vulnerabilidad
-     */
-    private function maybe_disable_plugin($plugin_file, $severity) {
-        $auto_disable = get_option('aegis_day0_auto_disable', 0);
-        
-        // Only auto-disable for Critical severity issues
-        if ($auto_disable && $severity === 'Critical') {
-            // Lista de plugins críticos que no deben desactivarse automáticamente
-            // Aplicar filtro para permitir personalización por el sitio
-            $critical_plugins = apply_filters(
-                'aegis_day0_critical_plugins',
-                [
-                    'wordpress-seo/wp-seo.php', 
-                    'woocommerce/woocommerce.php',
-                    'akismet/akismet.php',
-                    'classic-editor/classic-editor.php'
-                ]
-            );
-            
-            if (in_array($plugin_file, $critical_plugins, true)) {
-                Aegis_Day0_Logger::add_log(
-                    $plugin_file, 
-                    'Auto-disable skipped', 
-                    'Critical', 
-                    'System', 
-                    'Plugin crítico del sistema - no desactivar automáticamente'
-                );
-                return;
-            }
-            
-            // Get plugin info for logging
-            $plugins = get_plugins();
-            $plugin_name = isset($plugins[$plugin_file]) ? $plugins[$plugin_file]['Name'] : $plugin_file;
-            
-            // Log the action before disabling
-            Aegis_Day0_Logger::add_log(
-                $plugin_name, 
-                'Auto-disable triggered', 
-                'Critical', 
-                'System', 
-                'Plugin desactivado por vulnerabilidad crítica detectada'
-            );
-            
-            // Deactivate the plugin
-            deactivate_plugins($plugin_file);
-            
-            // Send immediate notification about the auto-disable action
-            $admin_email = get_option('admin_email');
-            if (is_email($admin_email)) {
-                $subject = __('🚨 Aegis Day0 - Plugin desactivado automáticamente', 'aegis-day0');
-                $message = sprintf(
-                    __("El plugin '%s' ha sido desactivado automáticamente debido a una vulnerabilidad crítica detectada.\n\nPor favor, revise el dashboard de Aegis Day0 para más detalles.", 'aegis-day0'),
-                    $plugin_name
-                );
-                wp_mail(
-                    sanitize_email($admin_email), 
-                    $subject, 
-                    $message, 
-                    ['Content-Type: text/plain; charset=UTF-8']
-                );
-            }
-        }
+    private function get_code_snippet($content, $line_number, $lines_around = 2) {
+        $lines = explode("\n", $content);
+        $start = max(0, $line_number - 1 - $lines_around);
+        $end = min(count($lines), $line_number - 1 + $lines_around + 1);
+        return implode("\n", array_slice($lines, $start, $end - $start));
     }
 }
