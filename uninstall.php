@@ -21,3 +21,9 @@ $wpdb->query("DROP TABLE IF EXISTS $table_name");
 
 // Clear scheduled events
 wp_clear_scheduled_hook('aegis_day0_send_report');
+
+// Limpiar opciones transitorias y datos del plugin (incluyendo logs de FPs)
+$wpdb->query( "DELETE FROM $wpdb->options WHERE option_name LIKE '_transient_aegis_%' OR option_name LIKE 'aegis_day0_%'" );
+
+// Limpiar cualquier otra opción residual que pueda haber quedado
+$wpdb->query( "DELETE FROM $wpdb->options WHERE option_name LIKE '%aegis%day0%'" );
