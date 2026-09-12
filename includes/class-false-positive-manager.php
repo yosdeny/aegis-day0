@@ -166,7 +166,7 @@ class Aegis_False_Positive_Manager {
      * Obtiene todos los hashes de falsos positivos para un plugin y archivo
      * 
      * @param string $plugin_file Archivo del plugin
-     * @param string|null $file_path Ruta del archivo (null para todos los archivos del plugin)
+     * @param string|null $file_path Ruta del archivo (null para todos los archivos del plugin, '*' para comodín)
      * @return array Array de hashes de issues marcados como falsos positivos
      */
     public static function get_false_positives($plugin_file, $file_path = null) {
@@ -174,7 +174,8 @@ class Aegis_False_Positive_Manager {
         
         $table_name = $wpdb->prefix . self::TABLE_NAME;
         
-        if ($file_path === null) {
+        // Si file_path es '*' o null, obtener todos los FPs del plugin
+        if ($file_path === null || $file_path === '*') {
             $results = $wpdb->get_results($wpdb->prepare(
                 "SELECT issue_hash, issue_type, file_path, marked_at, notes 
                  FROM $table_name 
@@ -204,7 +205,7 @@ class Aegis_False_Positive_Manager {
      * Verifica si un issue específico está marcado como falso positivo
      * 
      * @param string $plugin_file Archivo del plugin
-     * @param string $file_path Ruta del archivo
+     * @param string $file_path Ruta del archivo (puede ser '*' para comodín)
      * @param array $issue Datos del issue
      * @return bool True si es falso positivo, False si no
      */
@@ -214,13 +215,23 @@ class Aegis_False_Positive_Manager {
         $table_name = $wpdb->prefix . self::TABLE_NAME;
         $issue_hash = self::generate_issue_hash($issue);
         
-        $exists = $wpdb->get_var($wpdb->prepare(
-            "SELECT id FROM $table_name 
-             WHERE plugin_file = %s AND file_path = %s AND issue_hash = %s",
-            $plugin_file,
-            $file_path,
-            $issue_hash
-        ));
+        // Si file_path es '*', buscar en todos los archivos del plugin
+        if ($file_path === '*') {
+            $exists = $wpdb->get_var($wpdb->prepare(
+                "SELECT id FROM $table_name 
+                 WHERE plugin_file = %s AND issue_hash = %s",
+                $plugin_file,
+                $issue_hash
+            ));
+        } else {
+            $exists = $wpdb->get_var($wpdb->prepare(
+                "SELECT id FROM $table_name 
+                 WHERE plugin_file = %s AND file_path = %s AND issue_hash = %s",
+                $plugin_file,
+                $file_path,
+                $issue_hash
+            ));
+        }
         
         return (bool) $exists;
     }
@@ -246,14 +257,15 @@ class Aegis_False_Positive_Manager {
         
         // Paso 1: Agrupar alertas por archivo y detectar cuáles tienen errores nuevos
         $alerts_by_file = [];
+        $alerts_without_file = []; // Para alertas sin file_path específico
         
         foreach ($alerts as $alert) {
             // Soporte para diferentes nombres de claves
             $file_path = isset($alert['file']) ? $alert['file'] : (isset($alert['file_path']) ? $alert['file_path'] : '');
             
             if (empty($file_path)) {
-                // Si no tiene file, incluir la alerta directamente
-                $filtered_alerts[] = $alert;
+                // Si no tiene file, guardarlas separadamente para procesar con FP globales del plugin
+                $alerts_without_file[] = $alert;
                 continue;
             }
             
@@ -271,6 +283,23 @@ class Aegis_False_Positive_Manager {
             $issue_hash = self::generate_issue_hash($alert);
             $alerts_by_file[$key]['alerts'][] = $alert;
             $alerts_by_file[$key]['hashes'][] = $issue_hash;
+        }
+        
+        // Procesar alertas sin file_path específico (FP a nivel de plugin)
+        if (!empty($alerts_without_file)) {
+            // Obtener FPs globales del plugin (file_path = '*')
+            $global_fps = self::get_false_positives($plugin_file, '*');
+            $global_fp_hashes = wp_list_pluck($global_fps, 'issue_hash');
+            
+            foreach ($alerts_without_file as $alert) {
+                $h = self::generate_issue_hash($alert);
+                if (in_array($h, $global_fp_hashes)) {
+                    $alert['is_false_positive'] = true;
+                } else {
+                    $alert['is_false_positive'] = false;
+                }
+                $filtered_alerts[] = $alert;
+            }
         }
         
         // Paso 2: Para cada archivo, verificar si hay errores nuevos (no marcados como FP)
@@ -375,11 +404,15 @@ class Aegis_False_Positive_Manager {
         $issue_source = isset($_POST['issue_source']) ? sanitize_text_field($_POST['issue_source']) : '';
         $notes = isset($_POST['notes']) ? sanitize_textarea_field($_POST['notes']) : '';
         
-        // Validar solo los campos requeridos esenciales (plugin_file y file_path)
-        // issue_type puede ser derivado o tener valores por defecto
-        if (empty($plugin_file) || empty($file_path)) {
-            wp_send_json_error(['message' => __('Datos incompletos: faltan plugin o archivo', 'aegis-day0')]);
+        // Validar solo plugin_file (file_path es opcional para marcar todo el plugin)
+        if (empty($plugin_file)) {
+            wp_send_json_error(['message' => __('Datos incompletos: falta el archivo del plugin', 'aegis-day0')]);
             return;
+        }
+        
+        // Si file_path está vacío, usamos un valor comodín para marcar todo el plugin
+        if (empty($file_path)) {
+            $file_path = '*'; // Comodín para todos los archivos
         }
         
         // Si issue_type está vacío, usar un valor por defecto
