@@ -162,18 +162,22 @@ function aegis_day0_dashboard_page() {
                             $icon = ($fp_risk === 'Alto') ? '⚠️' : (($fp_risk === 'Medio') ? '◐' : '✅');
                             $severity_color = ($alert['severity'] === 'Critical') ? 'red' : 'orange';
                             $is_fp = isset($alert['is_false_positive']) && $alert['is_false_positive'];
+                            
+                            // Soporte para diferentes nombres de claves para el archivo
+                            $file_path = isset($alert['file']) ? $alert['file'] : (isset($alert['file_path']) ? $alert['file_path'] : '');
+                            $plugin_file = isset($alert['plugin']) ? $alert['plugin'] : (isset($alert['plugin_file']) ? $alert['plugin_file'] : '');
                         ?>
                         <tr<?php echo $is_fp ? ' style="background-color: #f0f0f1; opacity: 0.7;"' : ''; ?>>
-                            <td><strong><?php echo esc_html($alert['plugin']); ?></strong></td>
+                            <td><strong><?php echo esc_html($plugin_file); ?></strong></td>
                             <td><?php echo esc_html($alert['type']); ?></td>
                             <td><span style="color: <?php echo $severity_color; ?>; font-weight: bold;"><?php echo esc_html($alert['severity']); ?></span></td>
                             <td><?php echo esc_html($alert['source']); ?></td>
                             <td><?php echo $icon . ' ' . esc_html($fp_risk); ?></td>
                             <td>
-                                <?php if (!$is_fp) : ?>
+                                <?php if (!$is_fp && !empty($plugin_file) && !empty($file_path)) : ?>
                                     <button class="button button-small mark-fp" 
-                                            data-plugin="<?php echo esc_attr($alert['plugin']); ?>"
-                                            data-file="<?php echo esc_attr(isset($alert['file']) ? $alert['file'] : ''); ?>"
+                                            data-plugin="<?php echo esc_attr($plugin_file); ?>"
+                                            data-file="<?php echo esc_attr($file_path); ?>"
                                             data-type="<?php echo esc_attr($alert['type']); ?>"
                                             data-function="<?php echo esc_attr(isset($alert['function']) ? $alert['function'] : ''); ?>"
                                             data-line="<?php echo esc_attr(isset($alert['line']) ? $alert['line'] : 0); ?>"
@@ -181,8 +185,10 @@ function aegis_day0_dashboard_page() {
                                             data-source="<?php echo esc_attr($alert['source']); ?>">
                                         🚫 Marcar como FP
                                     </button>
-                                <?php else : ?>
+                                <?php elseif ($is_fp) : ?>
                                     <span style="color: #666; font-style: italic;">Marcado como FP</span>
+                                <?php else : ?>
+                                    <span style="color: #999; font-size: 11px;">Sin datos de archivo</span>
                                 <?php endif; ?>
                             </td>
                         </tr>
@@ -214,32 +220,35 @@ function aegis_day0_dashboard_page() {
         $(document).on('click', '.mark-fp', function(e) {
             e.preventDefault();
             
-            // Debug: Ver qué datos tenemos disponibles
             var $btn = $(this);
-            console.log('Botón data attributes:', {
-                plugin: $btn.data('plugin'),
-                file: $btn.data('file'),
-                type: $btn.data('type'),
-                function: $btn.data('function'),
-                line: $btn.data('line'),
-                severity: $btn.data('severity'),
-                source: $btn.data('source')
-            });
+            var pluginFile = $btn.data('plugin');
+            var filePath = $btn.data('file');
+            var issueType = $btn.data('type') || 'generic';
+            var issueFunction = $btn.data('function') || '';
+            var issueLine = $btn.data('line') || 0;
+            var issueSeverity = $btn.data('severity') || 'Unknown';
+            var issueSource = $btn.data('source') || '';
+            
+            console.log('=== DATOS DEL BOTÓN ===');
+            console.log('plugin:', pluginFile);
+            console.log('file:', filePath);
+            console.log('type:', issueType);
+            console.log('Todos los data attributes:', $btn.data());
             
             currentAlert = {
-                plugin_file: $btn.data('plugin') || '',
-                file_path: $btn.data('file') || '',
-                issue_type: $btn.data('type') || 'generic',
-                issue_function: $btn.data('function') || '',
-                issue_line: $btn.data('line') || 0,
-                issue_severity: $btn.data('severity') || 'Unknown',
-                issue_source: $btn.data('source') || ''
+                plugin_file: pluginFile,
+                file_path: filePath,
+                issue_type: issueType,
+                issue_function: issueFunction,
+                issue_line: issueLine,
+                issue_severity: issueSeverity,
+                issue_source: issueSource
             };
             
             // Validar datos mínimos requeridos
             if (!currentAlert.plugin_file || !currentAlert.file_path) {
-                alert('❌ Error: No se pudo identificar el plugin o archivo. Revisa la consola para más detalles.');
-                console.error('Datos incompletos para marcar como FP:', currentAlert);
+                alert('❌ Error: No se pudo identificar el plugin o archivo.\n\nPlugin: "' + currentAlert.plugin_file + '"\nArchivo: "' + currentAlert.file_path + '"\n\nRevisa la consola (F12) para ver todos los datos disponibles.');
+                console.error('❌ Datos incompletos para marcar como FP:', currentAlert);
                 return;
             }
             
@@ -270,6 +279,10 @@ function aegis_day0_dashboard_page() {
                 currentAlert.issue_type = 'generic';
             }
             
+            console.log('=== ENVIANDO AJAX ===');
+            console.log('Datos:', currentAlert);
+            console.log('Notas:', notes);
+            
             $.ajax({
                 url: ajaxurl,
                 type: 'POST',
@@ -286,17 +299,24 @@ function aegis_day0_dashboard_page() {
                     notes: notes
                 },
                 success: function(response) {
+                    console.log('=== RESPUESTA DEL SERVIDOR ===');
                     console.log('Response:', response);
+                    
                     if (response.success) {
                         alert('✅ ' + response.data.message);
                         location.reload();
                     } else {
-                        alert('❌ Error: ' + (response.data?.message || 'Error desconocido'));
+                        var errorMsg = response.data?.message || 'Error desconocido';
+                        console.error('❌ Error del servidor:', errorMsg);
+                        alert('❌ Error: ' + errorMsg);
                     }
                 },
                 error: function(xhr, status, error) {
-                    console.error('AJAX Error:', status, error);
-                    alert('❌ Error de conexión: ' + status);
+                    console.error('=== ERROR AJAX ===');
+                    console.error('Status:', status);
+                    console.error('Error:', error);
+                    console.error('XHR Response:', xhr.responseText);
+                    alert('❌ Error de conexión: ' + status + '\n\nRevisa la consola para más detalles.');
                 }
             });
             
