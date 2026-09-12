@@ -10,7 +10,8 @@ class Aegis_Day0_Scanner {
     private $false_positive_manager;
 
     public function __construct() {
-        require_once AEGIS_DAY0_PLUGIN_DIR . 'includes/class-false-positive-manager.php';
+        // Usar __DIR__ para garantizar la ruta correcta independientemente de dónde se instancie
+        require_once __DIR__ . '/class-false-positive-manager.php';
         $this->false_positive_manager = new Aegis_Day0_False_Positive_Manager();
     }
 
