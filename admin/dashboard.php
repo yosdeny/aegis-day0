@@ -244,6 +244,11 @@ function aegis_day0_dashboard_page() {
             
             var notes = $('#aegis-fp-notes').val();
             
+            // Asegurar que issue_type tenga un valor por defecto si está vacío
+            if (!currentAlert.issue_type || currentAlert.issue_type === '') {
+                currentAlert.issue_type = 'generic';
+            }
+            
             $.ajax({
                 url: ajaxurl,
                 type: 'POST',
@@ -260,15 +265,17 @@ function aegis_day0_dashboard_page() {
                     notes: notes
                 },
                 success: function(response) {
+                    console.log('Response:', response);
                     if (response.success) {
                         alert('✅ ' + response.data.message);
                         location.reload();
                     } else {
-                        alert('❌ Error: ' + response.data.message);
+                        alert('❌ Error: ' + (response.data?.message || 'Error desconocido'));
                     }
                 },
-                error: function() {
-                    alert('❌ Error de conexión');
+                error: function(xhr, status, error) {
+                    console.error('AJAX Error:', status, error);
+                    alert('❌ Error de conexión: ' + status);
                 }
             });
             
