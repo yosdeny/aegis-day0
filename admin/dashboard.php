@@ -110,13 +110,24 @@ add_action('admin_init', 'aegis_day0_handle_clean_scan');
 function aegis_day0_dashboard_page() {
     $alerts = get_option('aegis_day0_alerts', []);
     
-    // Aplicar filtro de falsos positivos si la clase existe
-    if (class_exists('Aegis_False_Positive_Manager')) {
-        // Obtener el plugin file desde el contexto (usamos el primero como referencia)
-        $plugin_file = !empty($alerts) && isset($alerts[0]['plugin']) ? $alerts[0]['plugin'] : '';
-        if ($plugin_file) {
-            $alerts = apply_filters('aegis_day0_filter_alerts', $alerts, $plugin_file);
+    // Agrupar alertas por plugin para aplicar el filtro correctamente
+    $alerts_by_plugin = [];
+    foreach ($alerts as $alert) {
+        $plugin_file = isset($alert['plugin']) ? $alert['plugin'] : (isset($alert['plugin_file']) ? $alert['plugin_file'] : 'unknown');
+        if (!isset($alerts_by_plugin[$plugin_file])) {
+            $alerts_by_plugin[$plugin_file] = [];
         }
+        $alerts_by_plugin[$plugin_file][] = $alert;
+    }
+    
+    // Aplicar filtro de falsos positivos por cada plugin
+    if (class_exists('Aegis_False_Positive_Manager')) {
+        $filtered_alerts = [];
+        foreach ($alerts_by_plugin as $plugin_file => $plugin_alerts) {
+            $filtered = apply_filters('aegis_day0_filter_alerts', $plugin_alerts, $plugin_file);
+            $filtered_alerts = array_merge($filtered_alerts, $filtered);
+        }
+        $alerts = $filtered_alerts;
     }
     ?>
     <div class="wrap aegis-day0-dashboard">

@@ -278,7 +278,20 @@ class Aegis_Day0_Scanner {
             }
         }
 
+        // Guardar alertas actuales
         update_option('aegis_day0_alerts', $alerts);
+        
+        // Guardar snapshot de falsos positivos para cada plugin escaneado
+        if (class_exists('Aegis_False_Positive_Manager')) {
+            $processed_plugins = [];
+            foreach ($alerts as $alert) {
+                $plugin_file = isset($alert['plugin_file']) ? $alert['plugin_file'] : (isset($alert['plugin']) ? $alert['plugin'] : '');
+                if (!empty($plugin_file) && !isset($processed_plugins[$plugin_file])) {
+                    Aegis_False_Positive_Manager::save_fp_snapshot($plugin_file);
+                    $processed_plugins[$plugin_file] = true;
+                }
+            }
+        }
         
         // Merge previous notifications with currently detected ones to maintain state
         // Only keep notifications for vulnerabilities that are still present
