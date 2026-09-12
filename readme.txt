@@ -5,7 +5,7 @@ Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 8.0
 Tested PHP: 8.2
-Stable tag: 0.4
+Stable tag: 1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -50,6 +50,19 @@ Los resultados del análisis estático deben ser verificados manualmente. El plu
 
 == Changelog ==
 
+= 1.0 =
+* **Lanzamiento de la versión estable 1.0**: Primera versión oficial del plugin.
+* **Sistema avanzado de gestión de falsos positivos**: Implementación de un sistema robusto para marcar, almacenar y filtrar alertas como falsos positivos con persistencia en base de datos.
+* **Snapshot inteligente de estado**: Algoritmo de comparación de logs que detecta automáticamente nuevas incidencias comparando el estado actual con el último escaneo válido, evitando revisiones innecesarias cuando no hay cambios.
+* **Garantía de integridad de datos**: Todas las alertas generadas incluyen ahora explícitamente la ruta del archivo (`file_path`) normalizada, asegurando consistencia en la generación de hashes y el filtrado de falsos positivos.
+* **Soporte completo para todos los niveles de severidad**: Corrección de errores que impedían guardar falsos positivos en alertas de nivel Low y Medium. Ahora el sistema maneja correctamente Critical, High, Medium y Low.
+* **Normalización de rutas multiplataforma**: Las rutas de archivos se normalizan automáticamente (slashes, prefijos) para garantizar compatibilidad entre Windows y Linux.
+* **Optimización de almacenamiento**: Los snapshots de estado ahora guardan únicamente hashes esenciales, reduciendo drásticamente el uso de base de datos y eliminando errores de serialización.
+* **Interfaz mejorada de gestión**: Botón de Acciones funcional que permite revisar archivos específicos o marcar plugins completos como falsos positivos usando comodines.
+* **Limpieza automática en desinstalación**: El script `uninstall.php` elimina completamente todas las opciones, transients y tablas relacionadas, incluyendo los nuevos logs de snapshots.
+* Mejora en detección de falsos positivos: El analizador AST reconoce automáticamente patrones seguros de inclusión de archivos usando constantes estándar de WordPress.
+* Corrección de estilos CSS en el dashboard: tabla de vulnerabilidades ahora se muestra correctamente estructurada.
+
 = 0.4 =
 * Nueva funcionalidad en el dashboard: botón "Limpiar Alertas y Re-escanear" que elimina todos los resultados almacenados previamente y ejecuta un escaneo completamente limpio desde cero.
 * Interfaz visual para gestionar falsos positivos: ahora puedes limpiar manualmente el historial de alertas y forzar un re-escaneo con las reglas actualizadas directamente desde el dashboard.
@@ -77,6 +90,9 @@ Los resultados del análisis estático deben ser verificados manualmente. El plu
 * Sistema de logs y exportación.
 
 == Upgrade Notice ==
+
+= 1.0 =
+Lanzamiento de la versión estable 1.0. Incluye sistema completo de gestión de falsos positivos, snapshot inteligente de estado, garantía de integridad de datos en alertas, soporte para todos los niveles de severidad y optimización de almacenamiento. Actualización recomendada para todos los usuarios.
 
 = 0.4 =
 Nueva función para limpiar falsos positivos: botón en el dashboard para eliminar alertas almacenadas y re-escanear desde cero. Mejoras en detección de inclusiones dinámicas seguras.
