@@ -208,8 +208,8 @@ function aegis_day0_activate() {
     add_option('aegis_day0_notified_alerts', []);
     
     // Crear tabla de falsos positivos
-    if (class_exists('Aegis_False_Positive_Manager')) {
-        Aegis_False_Positive_Manager::maybe_create_table();
+    if (class_exists('Aegis_Day0_False_Positive_Manager')) {
+        Aegis_Day0_False_Positive_Manager::maybe_create_table();
     }
     
     // Schedule initial report

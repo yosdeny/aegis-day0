@@ -121,7 +121,7 @@ function aegis_day0_dashboard_page() {
     }
     
     // Aplicar filtro de falsos positivos por cada plugin
-    if (class_exists('Aegis_False_Positive_Manager')) {
+    if (class_exists('Aegis_Day0_False_Positive_Manager')) {
         $filtered_alerts = [];
         foreach ($alerts_by_plugin as $plugin_file => $plugin_alerts) {
             $filtered = apply_filters('aegis_day0_filter_alerts', $plugin_alerts, $plugin_file);

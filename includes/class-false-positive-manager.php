@@ -623,4 +623,4 @@ class Aegis_Day0_False_Positive_Manager {
 }
 
 // Inicializar el gestor
-Aegis_False_Positive_Manager::init();
+Aegis_Day0_False_Positive_Manager::init();
