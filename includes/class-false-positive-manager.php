@@ -117,9 +117,8 @@ class Aegis_False_Positive_Manager {
         $issue_hash = self::generate_issue_hash($issue, true);
         $user_id = get_current_user_id();
         
-        // Verificar si ya existe (usando validador para detectar errores de marcadores)
-        $prepared_query = GRM_Query_Validator::safe_prepare(
-            $wpdb,
+        // Verificar si ya existe
+        $prepared_query = $wpdb->prepare(
             "SELECT id FROM $table_name WHERE plugin_file = %s AND file_path = %s AND issue_hash = %s",
             $plugin_file,
             $file_path,
@@ -192,8 +191,7 @@ class Aegis_False_Positive_Manager {
         
         // Si file_path es '*' o null, obtener todos los FPs del plugin
         if ($file_path === null || $file_path === '*') {
-            $prepared_query = GRM_Query_Validator::safe_prepare(
-                $wpdb,
+            $prepared_query = $wpdb->prepare(
                 "SELECT issue_hash, issue_type, file_path, marked_at, notes 
                  FROM $table_name 
                  WHERE plugin_file = %s
@@ -491,8 +489,7 @@ class Aegis_False_Positive_Manager {
         // Obtener el plugin_file para actualizar el snapshot
         global $wpdb;
         $table_name = $wpdb->prefix . self::TABLE_NAME;
-        $prepared_query = GRM_Query_Validator::safe_prepare(
-            $wpdb,
+        $prepared_query = $wpdb->prepare(
             "SELECT plugin_file FROM $table_name WHERE id = %d",
             $fp_id
         );
@@ -552,8 +549,7 @@ class Aegis_False_Positive_Manager {
         
         // 1. Obtener solo los hashes de los FPs actuales para este plugin
         $table_name = $wpdb->prefix . self::TABLE_NAME;
-        $prepared_query = GRM_Query_Validator::safe_prepare(
-            $wpdb,
+        $prepared_query = $wpdb->prepare(
             "SELECT issue_hash FROM $table_name WHERE plugin_file = %s ORDER BY issue_hash",
             $plugin_file
         );
@@ -602,8 +598,7 @@ class Aegis_False_Positive_Manager {
         
         // Obtener estado actual directamente de la BD (solo hashes)
         $table_name = $wpdb->prefix . self::TABLE_NAME;
-        $prepared_query = GRM_Query_Validator::safe_prepare(
-            $wpdb,
+        $prepared_query = $wpdb->prepare(
             "SELECT issue_hash FROM $table_name WHERE plugin_file = %s ORDER BY issue_hash",
             $plugin_file
         );
