@@ -62,6 +62,14 @@ class Aegis_Day0_Scanner {
         $currently_detected = []; // Track what's currently detected
         $new_notifications = []; // Track new alerts to notify
         
+        // Cargar el gestor de falsos positivos si no está cargado
+        if (!class_exists('Aegis_False_Positive_Manager')) {
+            $fp_manager_path = __DIR__ . '/class-false-positive-manager.php';
+            if (file_exists($fp_manager_path)) {
+                require_once $fp_manager_path;
+            }
+        }
+        
         // Obtener ruta del plugin actual para excluirlo del escaneo (evitar falsos positivos en el propio plugin)
         $self_plugin_file = 'aegis-day0/aegis-day0.php';
         if (defined('AEGIS_DAY0_PLUGIN_DIR')) {
@@ -98,6 +106,34 @@ class Aegis_Day0_Scanner {
                 
                 if (!isset($processed_alerts[$alert_key])) {
                     $processed_alerts[$alert_key] = true;
+                    
+                    // Verificar si es un falso positivo conocido usando el gestor de FPs
+                    $is_fp = false;
+                    if (class_exists('Aegis_False_Positive_Manager')) {
+                        $fp_issue = [
+                            'type' => $issue['type'],
+                            'severity' => $issue['severity'],
+                            'source' => 'Static Scan',
+                            'function' => '',
+                            'line' => 0
+                        ];
+                        $is_fp = Aegis_False_Positive_Manager::is_false_positive($plugin_file, $issue['file_path'] ?? '', $fp_issue);
+                    }
+                    
+                    // Si es FP, no notificar pero sí registrar para el panel
+                    if ($is_fp) {
+                        $alerts[] = [
+                            'plugin'      => $plugin_name,
+                            'plugin_file' => $plugin_file,
+                            'file_path'   => $issue['file_path'] ?? '',
+                            'type'        => sanitize_text_field($issue['type']),
+                            'severity'    => sanitize_text_field($issue['severity']),
+                            'source'      => 'Static Scan',
+                            'false_positive_risk' => isset($issue['false_positive_risk']) ? $issue['false_positive_risk'] : 'unknown',
+                            'is_false_positive' => true
+                        ];
+                        continue; // Saltar notificación y auto-disable
+                    }
                     
                     $alerts[] = [
                         'plugin'      => $plugin_name,
@@ -148,6 +184,36 @@ class Aegis_Day0_Scanner {
                     
                     if (!isset($processed_alerts[$alert_key])) {
                         $processed_alerts[$alert_key] = true;
+                        
+                        // Verificar si es un falso positivo conocido usando el gestor de FPs
+                        $is_fp = false;
+                        if (class_exists('Aegis_False_Positive_Manager')) {
+                            $fp_issue = [
+                                'type' => $issue['type'],
+                                'severity' => $issue['severity'],
+                                'source' => 'Token Analysis',
+                                'function' => $issue['function'] ?? '',
+                                'line' => $issue['line'] ?? 0
+                            ];
+                            $is_fp = Aegis_False_Positive_Manager::is_false_positive($plugin_file, $issue['file_path'] ?? '', $fp_issue);
+                        }
+                        
+                        // Si es FP, no notificar pero sí registrar para el panel
+                        if ($is_fp) {
+                            $alerts[] = [
+                                'plugin'      => $plugin_name,
+                                'plugin_file' => $plugin_file,
+                                'file_path'   => $issue['file_path'] ?? '',
+                                'type'        => sanitize_text_field($issue['type']),
+                                'severity'    => sanitize_text_field($issue['severity']),
+                                'source'      => 'Token Analysis',
+                                'false_positive_risk' => isset($issue['false_positive_risk']) ? $issue['false_positive_risk'] : 'unknown',
+                                'function'    => isset($issue['function']) ? $issue['function'] : '',
+                                'line'        => isset($issue['line']) ? $issue['line'] : 0,
+                                'is_false_positive' => true
+                            ];
+                            continue; // Saltar notificación y auto-disable
+                        }
                         
                         $alerts[] = [
                             'plugin'      => $plugin_name,
@@ -202,6 +268,36 @@ class Aegis_Day0_Scanner {
                     if (!isset($processed_alerts[$alert_key])) {
                         $processed_alerts[$alert_key] = true;
 
+                        // Verificar si es un falso positivo conocido usando el gestor de FPs
+                        $is_fp = false;
+                        if (class_exists('Aegis_False_Positive_Manager')) {
+                            $fp_issue = [
+                                'type' => $issue['type'],
+                                'severity' => $issue['severity'],
+                                'source' => 'AST Analysis',
+                                'function' => $issue['function'] ?? '',
+                                'line' => $issue['line'] ?? 0
+                            ];
+                            $is_fp = Aegis_False_Positive_Manager::is_false_positive($plugin_file, $issue['file_path'] ?? '', $fp_issue);
+                        }
+
+                        // Si es FP, no notificar pero sí registrar para el panel
+                        if ($is_fp) {
+                            $alerts[] = [
+                                'plugin'      => $plugin_name,
+                                'plugin_file' => $plugin_file,
+                                'file_path'   => $issue['file_path'] ?? '',
+                                'type'        => sanitize_text_field($issue['type']),
+                                'severity'    => sanitize_text_field($issue['severity']),
+                                'source'      => 'AST Analysis',
+                                'false_positive_risk' => isset($issue['false_positive_risk']) ? $issue['false_positive_risk'] : 'unknown',
+                                'function'    => isset($issue['function']) ? $issue['function'] : '',
+                                'line'        => isset($issue['line']) ? $issue['line'] : 0,
+                                'is_false_positive' => true
+                            ];
+                            continue; // Saltar notificación y auto-disable
+                        }
+
                         $alerts[] = [
                             'plugin'      => $plugin_name,
                             'plugin_file' => $plugin_file,
@@ -254,6 +350,37 @@ class Aegis_Day0_Scanner {
 
                     if (!isset($processed_alerts[$alert_key])) {
                         $processed_alerts[$alert_key] = true;
+
+                        // Verificar si es un falso positivo conocido usando el gestor de FPs
+                        $is_fp = false;
+                        if (class_exists('Aegis_False_Positive_Manager')) {
+                            $fp_issue = [
+                                'type' => $issue['type'],
+                                'severity' => 'Low',
+                                'source' => 'Prepare Scan',
+                                'function' => isset($issue['function']) ? $issue['function'] : 'wpdb::prepare',
+                                'line' => isset($issue['line']) ? $issue['line'] : 0
+                            ];
+                            $is_fp = Aegis_False_Positive_Manager::is_false_positive($plugin_file, $issue['file_path'] ?? '', $fp_issue);
+                        }
+
+                        // Si es FP, no notificar pero sí registrar para el panel
+                        if ($is_fp) {
+                            $alerts[] = [
+                                'plugin'      => $plugin_name,
+                                'plugin_file' => $plugin_file,
+                                'file_path'   => $issue['file_path'] ?? '',
+                                'type'        => sanitize_text_field($issue['type']),
+                                'severity'    => 'Low',
+                                'source'      => 'Prepare Scan',
+                                'false_positive_risk' => 'low',
+                                'function'    => isset($issue['function']) ? $issue['function'] : 'wpdb::prepare',
+                                'line'        => isset($issue['line']) ? $issue['line'] : 0,
+                                'description' => isset($issue['message']) ? $issue['message'] : '',
+                                'is_false_positive' => true
+                            ];
+                            continue; // Saltar notificación
+                        }
 
                         $alerts[] = [
                             'plugin'      => $plugin_name,
