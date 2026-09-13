@@ -52,7 +52,7 @@ function aegis_day0_init() {
     Aegis_Day0_Notify::init_batch_notifications();
     
     $scanner = new Aegis_Day0_Scanner();
-    $scanner->run_checks();
+    $scanner->run_all_checks();
 }
 
 // Programar escaneo periódico en lugar de ejecutar en cada carga admin

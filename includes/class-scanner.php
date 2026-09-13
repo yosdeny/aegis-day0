@@ -16,6 +16,30 @@ class Aegis_Day0_Scanner {
     }
 
     /**
+     * Run security checks on all installed plugins
+     */
+    public function run_all_checks() {
+        if (!function_exists('get_plugins')) {
+            require_once ABSPATH . 'wp-admin/includes/plugin.php';
+        }
+        
+        $all_plugins = get_plugins();
+        $all_results = array();
+        
+        foreach ($all_plugins as $plugin_file => $plugin_data) {
+            $results = $this->run_checks($plugin_file, $plugin_data);
+            if (!empty($results['critical']) || !empty($results['high']) || !empty($results['medium']) || !empty($results['low']) || !empty($results['info'])) {
+                $all_results[$plugin_file] = array(
+                    'data' => $plugin_data,
+                    'issues' => $results
+                );
+            }
+        }
+        
+        return $all_results;
+    }
+
+    /**
      * Run security checks on a plugin
      */
     public function run_checks($plugin_file, $plugin_data) {
