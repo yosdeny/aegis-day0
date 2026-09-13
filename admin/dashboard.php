@@ -177,9 +177,10 @@ function aegis_day0_dashboard_page() {
                             // Soporte para diferentes nombres de claves para el archivo
                             $file_path = isset($alert['file']) ? $alert['file'] : (isset($alert['file_path']) ? $alert['file_path'] : '');
                             $plugin_file = isset($alert['plugin']) ? $alert['plugin'] : (isset($alert['plugin_file']) ? $alert['plugin_file'] : '');
+                            $plugin_name = isset($alert['plugin_name']) ? $alert['plugin_name'] : $plugin_file;
                         ?>
                         <tr<?php echo $is_fp ? ' style="background-color: #f0f0f1; opacity: 0.7;"' : ''; ?>>
-                            <td><strong><?php echo esc_html($plugin_file); ?></strong></td>
+                            <td><strong><?php echo esc_html($plugin_name); ?></strong></td>
                             <td><?php echo esc_html($alert['type']); ?></td>
                             <td><span style="color: <?php echo $severity_color; ?>; font-weight: bold;"><?php echo esc_html($alert['severity']); ?></span></td>
                             <td><?php echo esc_html($alert['source']); ?></td>
