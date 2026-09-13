@@ -210,24 +210,9 @@ function aegis_day0_dashboard_page() {
         <?php endif; ?>
     </div>
     
-    <!-- Modal para marcar como falso positivo -->
-    <div id="aegis-fp-modal" style="display:none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999999;">
-        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #fff; padding: 30px; border-radius: 5px; max-width: 500px; width: 90%;">
-            <h3 style="margin-top: 0;">🚫 Marcar como Falso Positivo</h3>
-            <p id="aegis-fp-info" style="color: #666; margin-bottom: 20px;"></p>
-            <textarea id="aegis-fp-notes" placeholder="Notas opcionales: ¿Por qué es un falso positivo?" style="width: 100%; height: 100px; margin-bottom: 15px;"></textarea>
-            <div style="text-align: right;">
-                <button id="aegis-fp-cancel" class="button">Cancelar</button>
-                <button id="aegis-fp-confirm" class="button button-primary">Confirmar</button>
-            </div>
-        </div>
-    </div>
-    
     <script>
     jQuery(document).ready(function($) {
-        var currentAlert = null;
-        
-        // Click en botón "Marcar como FP"
+        // Click en botón "Marcar como FP" - Guardado directo sin modal
         $(document).on('click', '.mark-fp', function(e) {
             e.preventDefault();
             
@@ -240,70 +225,16 @@ function aegis_day0_dashboard_page() {
             var issueSeverity = $btn.attr('data-severity') || 'Unknown';
             var issueSource = $btn.attr('data-source') || '';
             
-            console.log('=== DATOS DEL BOTÓN ===');
-            console.log('plugin:', pluginFile);
-            console.log('type:', issueType);
-            console.log('Todos los data attributes:', $btn.data());
-            
-            currentAlert = {
-                $button: $btn,
-                plugin_file: pluginFile,
-                file_path: filePath,
-                issue_type: issueType,
-                issue_function: issueFunction,
-                issue_line: issueLine,
-                issue_severity: issueSeverity,
-                issue_source: issueSource
-            };
-            
-            // Validar datos mínimos requeridos - solo necesitamos el plugin_file
-            if (!currentAlert.plugin_file) {
-                alert('❌ Error: No se pudo identificar el plugin.\n\nPlugin: "' + (currentAlert.plugin_file || 'VACÍO') + '"\n\nRevisa la consola (F12) para ver todos los datos disponibles.');
-                console.error('❌ Datos incompletos para marcar como FP:', currentAlert);
+            // Validar datos mínimos requeridos
+            if (!pluginFile) {
+                alert('❌ Error: No se pudo identificar el plugin.');
+                console.error('❌ No hay plugin_file en los data attributes');
                 return;
             }
             
-            // Si no hay file_path, es porque puede haber múltiples archivos o aún no se ha determinado
-            // Esto es normal y permitimos continuar solo con el plugin_file
-            if (!currentAlert.file_path) {
-                console.log('⚠️ Nota: No hay file_path específico, se usará comodín para todo el plugin');
-            }
-            
-            $('#aegis-fp-info').text(
-                'Plugin: ' + currentAlert.plugin_file + '\n' +
-                (currentAlert.file_path ? 'Archivo: ' + currentAlert.file_path + '\n' : '') +
-                'Tipo: ' + currentAlert.issue_type + '\n' +
-                'Línea: ' + currentAlert.issue_line
-            );
-            $('#aegis-fp-modal').fadeIn();
-        });
-        
-        // Cancelar
-        $('#aegis-fp-cancel').click(function() {
-            $('#aegis-fp-modal').fadeOut();
-            $('#aegis-fp-notes').val('');
-            currentAlert = null;
-        });
-        
-        // Confirmar
-        $('#aegis-fp-confirm').click(function() {
-            if (!currentAlert) return;
-            
-            var $confirmBtn = $(this);
-            var originalText = $confirmBtn.text();
-            var notes = $('#aegis-fp-notes').val();
-            
-            // Asegurar que issue_type tenga un valor por defecto si está vacío
-            if (!currentAlert.issue_type || currentAlert.issue_type === '') {
-                currentAlert.issue_type = 'generic';
-            }
-            
-            // Mostrar estado de carga
-            $confirmBtn.prop('disabled', true).text('⏳ Guardando...');
-            
-            console.log('=== ENVIANDO AJAX ===');
-            console.log('Datos:', currentAlert);
-            console.log('Notas:', notes);
+            // Mostrar estado de carga en el botón
+            var originalText = $btn.text();
+            $btn.prop('disabled', true).text('⏳ Guardando...');
             
             $.ajax({
                 url: ajaxurl,
@@ -311,75 +242,36 @@ function aegis_day0_dashboard_page() {
                 data: {
                     action: 'aegis_mark_false_positive',
                     nonce: '<?php echo wp_create_nonce('aegis_day0_nonce'); ?>',
-                    plugin_file: currentAlert.plugin_file,
-                    file_path: currentAlert.file_path || '',
-                    issue_type: currentAlert.issue_type,
-                    issue_function: currentAlert.issue_function || '',
-                    issue_line: parseInt(currentAlert.issue_line) || 0,
-                    issue_severity: currentAlert.issue_severity || 'Unknown',
-                    issue_source: currentAlert.issue_source || '',
-                    notes: notes
+                    plugin_file: pluginFile,
+                    file_path: filePath,
+                    issue_type: issueType.substring(0, 95),
+                    issue_function: issueFunction,
+                    issue_line: parseInt(issueLine) || 0,
+                    issue_severity: issueSeverity,
+                    issue_source: issueSource,
+                    notes: ''
                 },
                 success: function(response) {
-                    console.log('=== RESPUESTA DEL SERVIDOR ===');
-                    console.log('Response:', response);
-                    
-                    // Restaurar botón primero siempre
-                    $confirmBtn.prop('disabled', false).text(originalText);
+                    console.log('Respuesta servidor:', response);
                     
                     if (response && response.success) {
-                        // Cerrar modal
-                        $('#aegis-fp-modal').fadeOut();
-                        $('#aegis-fp-notes').val('');
-                        
-                        // Actualizar UI sin recargar
-                        var $row = currentAlert.$button.closest('tr');
-                        var $actionsCell = $row.find('td:last-child');
-                        
-                        // Cambiar botón por texto de confirmado
-                        $actionsCell.html('<span style="color: #666; font-style: italic;">✅ Marcado como FP</span>');
-                        $row.css('background-color', '#f0f0f1').css('opacity', '0.7');
-                        
-                        alert('✅ ' + (response.data?.message || 'Reporte marcado como falso positivo'));
-                        currentAlert = null;
+                        // Actualizar UI: cambiar botón por texto de confirmado
+                        $btn.closest('td').html('<span style="color: #666; font-style: italic;">✅ Marcado como FP</span>');
+                        $btn.closest('tr').css('background-color', '#f0f0f1').css('opacity', '0.7');
                     } else {
-                        var errorMsg = (response && response.data && response.data.message) ? response.data.message : 'Error desconocido del servidor';
-                        console.error('❌ Error del servidor:', errorMsg);
-                        alert('❌ Error: ' + errorMsg);
-                        currentAlert = null;
+                        // Error: restaurar botón y mostrar mensaje
+                        $btn.prop('disabled', false).text(originalText);
+                        var errorMsg = response && response.data && response.data.message ? response.data.message : 'Error desconocido';
+                        alert('❌ Error al guardar: ' + errorMsg);
                     }
                 },
                 error: function(xhr, status, error) {
-                    console.error('=== ERROR AJAX ===');
-                    console.error('Status:', status);
-                    console.error('Error:', error);
-                    console.error('XHR Response:', xhr.responseText);
-                    
-                    // Restaurar botón
-                    $confirmBtn.prop('disabled', false).text(originalText);
-                    
-                    // Intentar parsear respuesta JSON aunque haya error HTTP
-                    var serverMsg = '';
-                    try {
-                        var resp = JSON.parse(xhr.responseText);
-                        if (resp && resp.data && resp.data.message) {
-                            serverMsg = resp.data.message;
-                        }
-                    } catch(e) {}
-                    
-                    alert('❌ Error de conexión: ' + status + (serverMsg ? '\n\nDetalle: ' + serverMsg : '') + '\n\nRevisa la consola para más detalles.');
-                    currentAlert = null;
+                    console.error('Error AJAX:', status, error);
+                    console.error('Respuesta completa:', xhr.responseText);
+                    $btn.prop('disabled', false).text(originalText);
+                    alert('❌ Error de comunicación: ' + error);
                 }
             });
-        });
-        
-        // Cerrar modal al hacer click fuera
-        $('#aegis-fp-modal').click(function(e) {
-            if ($(e.target).is('#aegis-fp-modal')) {
-                $('#aegis-fp-modal').fadeOut();
-                $('#aegis-fp-notes').val('');
-                currentAlert = null;
-            }
         });
     });
     </script>
