@@ -252,16 +252,28 @@ function aegis_day0_dashboard_page() {
                     notes: ''
                 },
                 success: function(response) {
-                    console.log('Respuesta servidor:', response);
+                    console.log('✅ Respuesta servidor:', response);
                     
                     if (response && response.success) {
-                        // Actualizar UI: cambiar botón por texto de confirmado
-                        $btn.closest('td').html('<span style="color: #666; font-style: italic;">✅ Marcado como FP</span>');
-                        $btn.closest('tr').css('background-color', '#f0f0f1').css('opacity', '0.7');
+                        // Éxito real: Reemplazar TODA la celda con mensaje confirmado
+                        var $td = $btn.closest('td');
+                        var $tr = $btn.closest('tr');
+                        
+                        // Cambiar estilo de la fila
+                        $tr.css({
+                            'background-color': '#f0f0f1',
+                            'opacity': '0.7'
+                        });
+                        
+                        // Reemplazar contenido de la celda
+                        $td.html('<span style="color: #46b450; font-weight: bold;">✓ Marcado como FP</span>');
+                        
+                        console.log('✅ UI actualizada correctamente');
                     } else {
-                        // Error: restaurar botón y mostrar mensaje
-                        $btn.prop('disabled', false).text(originalText);
+                        // Error lógico del servidor: restaurar botón
                         var errorMsg = response && response.data && response.data.message ? response.data.message : 'Error desconocido';
+                        console.error('❌ Error servidor:', errorMsg);
+                        $btn.prop('disabled', false).text('🚫 Marcar como FP');
                         alert('❌ Error al guardar: ' + errorMsg);
                     }
                 },
