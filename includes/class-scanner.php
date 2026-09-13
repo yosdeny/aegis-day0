@@ -17,6 +17,11 @@ class Aegis_Day0_Scanner {
     private $ast_analyzer;
     
     /**
+     * Instancia del escáner de consultas prepare()
+     */
+    private $prepare_scanner;
+    
+    /**
      * Constructor - inicializa los analizadores
      */
     public function __construct() {
@@ -25,6 +30,13 @@ class Aegis_Day0_Scanner {
         }
         if (class_exists('Aegis_AST_Analyzer')) {
             $this->ast_analyzer = new Aegis_AST_Analyzer();
+        }
+        // Cargar el escáner de wpdb::prepare si existe
+        if (file_exists(__DIR__ . '/class-query-prepare-scanner.php')) {
+            require_once __DIR__ . '/class-query-prepare-scanner.php';
+            if (class_exists('GRM_Query_Prepare_Scanner')) {
+                $this->prepare_scanner = new GRM_Query_Prepare_Scanner();
+            }
         }
     }
 
@@ -230,6 +242,45 @@ class Aegis_Day0_Scanner {
                             $issue['false_positive_risk'] === 'low') {
                             $this->maybe_disable_plugin($plugin_file, $issue['severity']);
                         }
+                    }
+                }
+            }
+
+            // Escaneo de consultas wpdb::prepare() mal formadas (Code Quality)
+            if ($this->prepare_scanner && method_exists($this->prepare_scanner, 'scan_plugin')) {
+                $prepare_issues = $this->prepare_scanner->scan_plugin($plugin_file);
+                foreach ($prepare_issues as $issue) {
+                    $alert_key = md5($plugin_name . '|' . $issue['type'] . '|' . $issue['line'] . '|prepare|' . ($issue['file_path'] ?? ''));
+
+                    if (!isset($processed_alerts[$alert_key])) {
+                        $processed_alerts[$alert_key] = true;
+
+                        $alerts[] = [
+                            'plugin'      => $plugin_name,
+                            'plugin_file' => $plugin_file,
+                            'file_path'   => $issue['file_path'] ?? '',
+                            'type'        => sanitize_text_field($issue['type']),
+                            'severity'    => 'Low', // Es un warning de calidad de código, no una vulnerabilidad crítica
+                            'source'      => 'Prepare Scan',
+                            'false_positive_risk' => 'low', // El escáner es preciso
+                            'function'    => isset($issue['function']) ? $issue['function'] : 'wpdb::prepare',
+                            'line'        => isset($issue['line']) ? $issue['line'] : 0,
+                            'description' => isset($issue['message']) ? $issue['message'] : ''
+                        ];
+
+                        // Track this detection
+                        $currently_detected[$alert_key] = true;
+
+                        Aegis_Day0_Logger::add_log(
+                            $plugin_name,
+                            $issue['type'],
+                            'Low',
+                            'Prepare Scan',
+                            sprintf('Línea %d: %s', $issue['line'], $issue['message'])
+                        );
+
+                        // No enviar notificaciones para warnings de calidad de código
+                        // Solo registrar en el panel para que el desarrollador lo vea
                     }
                 }
             }
