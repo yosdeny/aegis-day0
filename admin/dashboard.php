@@ -76,7 +76,7 @@ function aegis_day0_handle_force_scan() {
         if (current_user_can('manage_options')) {
             delete_transient('aegis_day0_last_scan');
             $scanner = new Aegis_Day0_Scanner();
-            $scanner->run_checks();
+            $scanner->run_all_checks();
             echo '<div class="notice notice-success is-dismissible"><p>Escaneo forzado completado con exito.</p></div>';
         }
     }
@@ -96,7 +96,7 @@ function aegis_day0_handle_clean_scan() {
             
             // Ejecutar nuevo escaneo limpio
             $scanner = new Aegis_Day0_Scanner();
-            $scanner->run_checks();
+            $scanner->run_all_checks();
             
             echo '<div class="notice notice-success is-dismissible"><p>🧹 Escaneo limpio completado. Se eliminaron los falsos positivos anteriores.</p></div>';
         }
