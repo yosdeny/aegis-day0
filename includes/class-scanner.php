@@ -281,11 +281,39 @@ class Aegis_Day0_Scanner {
         // Guardar alertas actuales
         update_option('aegis_day0_alerts', $alerts);
         
-        // Guardar snapshot de falsos positivos para cada plugin escaneado
+        // Marcar alertas que son falsos positivos
         if (class_exists('Aegis_False_Positive_Manager')) {
             $processed_plugins = [];
+            foreach ($alerts as &$alert) {
+                $plugin_file = isset($alert['plugin_file']) ? $alert['plugin_file'] : '';
+                $file_path = isset($alert['file_path']) ? $alert['file_path'] : '';
+                
+                if (!empty($plugin_file)) {
+                    // Obtener FPs para este plugin y archivo
+                    $fps = Aegis_False_Positive_Manager::get_false_positives($plugin_file, $file_path);
+                    
+                    // Generar hash del issue actual
+                    $current_hash = Aegis_False_Positive_Manager::generate_issue_hash([
+                        'type' => $alert['type'],
+                        'function' => isset($alert['function']) ? $alert['function'] : '',
+                        'line' => isset($alert['line']) ? $alert['line'] : 0,
+                        'severity' => $alert['severity'],
+                        'source' => $alert['source']
+                    ]);
+                    
+                    // Marcar como FP si el hash coincide
+                    if (in_array($current_hash, $fps, true)) {
+                        $alert['is_false_positive'] = true;
+                    } else {
+                        $alert['is_false_positive'] = false;
+                    }
+                }
+            }
+            unset($alert);
+            
+            // Guardar snapshot de falsos positivos para cada plugin escaneado
             foreach ($alerts as $alert) {
-                $plugin_file = isset($alert['plugin_file']) ? $alert['plugin_file'] : (isset($alert['plugin']) ? $alert['plugin'] : '');
+                $plugin_file = isset($alert['plugin_file']) ? $alert['plugin_file'] : '';
                 if (!empty($plugin_file) && !isset($processed_plugins[$plugin_file])) {
                     Aegis_False_Positive_Manager::save_fp_snapshot($plugin_file);
                     $processed_plugins[$plugin_file] = true;
