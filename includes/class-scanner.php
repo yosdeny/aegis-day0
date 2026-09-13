@@ -307,12 +307,13 @@ class Aegis_Day0_Scanner {
                         }
                         
                         $full_path = $file->getPathname();
+                        $relative_path = str_replace(WP_PLUGIN_DIR . '/', '', $full_path);
                         
-                        // Excluir directorios problemáticos
+                        // Excluir directorios problemáticos (verificar en cualquier parte de la ruta)
                         $skip = false;
-                        foreach ($exclude_dirs as $exclude) {
-                            if (strpos($full_path, '/' . $exclude . '/') !== false || 
-                                strpos($full_path, '\\' . $exclude . '\\') !== false) {
+                        $path_parts = explode('/', str_replace('\\', '/', $relative_path));
+                        foreach ($path_parts as $part) {
+                            if (in_array(strtolower($part), $exclude_dirs)) {
                                 $skip = true;
                                 break;
                             }
@@ -322,13 +323,20 @@ class Aegis_Day0_Scanner {
                             continue;
                         }
                         
-                        // Excluir archivos muy grandes (> 500KB)
-                        if ($file->getSize() > 500000) {
+                        // Excluir archivos muy grandes (> 100KB)
+                        if ($file->getSize() > 100000) {
                             continue;
                         }
                         
-                        $relative = str_replace(WP_PLUGIN_DIR . '/', '', $full_path);
-                        $files[] = str_replace('\\', '/', $relative);
+                        // Excluir plugins conocidos de gran tamaño
+                        if (strpos($relative_path, 'woocommerce/') !== false || 
+                            strpos($relative_path, 'elementor/') !== false ||
+                            strpos($relative_path, 'jetpack/') !== false ||
+                            strpos($relative_path, 'wpbakery/') !== false) {
+                            continue;
+                        }
+                        
+                        $files[] = str_replace('\\', '/', $relative_path);
                     }
                 }
             } catch (Exception $e) {
