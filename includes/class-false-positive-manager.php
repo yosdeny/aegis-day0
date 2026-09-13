@@ -403,7 +403,7 @@ class Aegis_False_Positive_Manager {
         // Obtener y validar datos - convertir null a string vacío antes de sanitizar
         $plugin_file = isset($_POST['plugin_file']) ? sanitize_text_field((string) $_POST['plugin_file']) : '';
         $file_path = isset($_POST['file_path']) ? sanitize_text_field((string) $_POST['file_path']) : '';
-        $issue_type = isset($_POST['issue_type']) ? sanitize_text_field((string) $_POST['issue_type']) : '';
+        $issue_type_raw = isset($_POST['issue_type']) ? (string) $_POST['issue_type'] : '';
         $issue_function = isset($_POST['issue_function']) ? sanitize_text_field((string) $_POST['issue_function']) : '';
         $issue_line = isset($_POST['issue_line']) ? intval($_POST['issue_line']) : 0;
         $issue_severity = isset($_POST['issue_severity']) ? sanitize_text_field((string) $_POST['issue_severity']) : '';
@@ -422,8 +422,11 @@ class Aegis_False_Positive_Manager {
         }
         
         // Si issue_type está vacío, usar un valor por defecto
-        if (empty($issue_type)) {
+        // IMPORTANTE: Truncar a 95 caracteres para asegurar que no exceda el límite de 100 de la BD
+        if (empty($issue_type_raw)) {
             $issue_type = 'generic';
+        } else {
+            $issue_type = substr(sanitize_text_field($issue_type_raw), 0, 95);
         }
         
         $issue = [
