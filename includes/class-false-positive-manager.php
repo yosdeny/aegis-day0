@@ -421,12 +421,12 @@ class Aegis_False_Positive_Manager {
             $file_path = '*'; // Comodín para todos los archivos
         }
         
-        // Si issue_type está vacío, usar un valor por defecto
-        // IMPORTANTE: Truncar a 95 caracteres para asegurar que no exceda el límite de 100 de la BD
-        if (empty($issue_type_raw)) {
-            $issue_type = 'generic';
+        // Si issue_type está vacío o es demasiado largo, usar un valor genérico corto
+        // NOTA: issue_type es solo informativo, la verificación real usa issue_hash
+        if (empty($issue_type_raw) || strlen($issue_type_raw) > 50) {
+            $issue_type = 'fp_marker';
         } else {
-            $issue_type = substr(sanitize_text_field($issue_type_raw), 0, 95);
+            $issue_type = sanitize_text_field($issue_type_raw);
         }
         
         $issue = [
