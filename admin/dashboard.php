@@ -312,19 +312,22 @@ function aegis_day0_dashboard_page() {
                     action: 'aegis_mark_false_positive',
                     nonce: '<?php echo wp_create_nonce('aegis_day0_nonce'); ?>',
                     plugin_file: currentAlert.plugin_file,
-                    file_path: currentAlert.file_path,
+                    file_path: currentAlert.file_path || '',
                     issue_type: currentAlert.issue_type,
-                    issue_function: currentAlert.issue_function,
-                    issue_line: currentAlert.issue_line,
-                    issue_severity: currentAlert.issue_severity,
-                    issue_source: currentAlert.issue_source,
+                    issue_function: currentAlert.issue_function || '',
+                    issue_line: parseInt(currentAlert.issue_line) || 0,
+                    issue_severity: currentAlert.issue_severity || 'Unknown',
+                    issue_source: currentAlert.issue_source || '',
                     notes: notes
                 },
                 success: function(response) {
                     console.log('=== RESPUESTA DEL SERVIDOR ===');
                     console.log('Response:', response);
                     
-                    if (response.success) {
+                    // Restaurar botón primero siempre
+                    $confirmBtn.prop('disabled', false).text(originalText);
+                    
+                    if (response && response.success) {
                         // Cerrar modal
                         $('#aegis-fp-modal').fadeOut();
                         $('#aegis-fp-notes').val('');
@@ -337,13 +340,13 @@ function aegis_day0_dashboard_page() {
                         $actionsCell.html('<span style="color: #666; font-style: italic;">✅ Marcado como FP</span>');
                         $row.css('background-color', '#f0f0f1').css('opacity', '0.7');
                         
-                        alert('✅ ' + response.data.message);
+                        alert('✅ ' + (response.data?.message || 'Reporte marcado como falso positivo'));
                         currentAlert = null;
                     } else {
-                        var errorMsg = response.data?.message || 'Error desconocido';
+                        var errorMsg = (response && response.data && response.data.message) ? response.data.message : 'Error desconocido del servidor';
                         console.error('❌ Error del servidor:', errorMsg);
                         alert('❌ Error: ' + errorMsg);
-                        $confirmBtn.prop('disabled', false).text(originalText);
+                        currentAlert = null;
                     }
                 },
                 error: function(xhr, status, error) {
@@ -351,8 +354,21 @@ function aegis_day0_dashboard_page() {
                     console.error('Status:', status);
                     console.error('Error:', error);
                     console.error('XHR Response:', xhr.responseText);
-                    alert('❌ Error de conexión: ' + status + '\n\nRevisa la consola para más detalles.');
+                    
+                    // Restaurar botón
                     $confirmBtn.prop('disabled', false).text(originalText);
+                    
+                    // Intentar parsear respuesta JSON aunque haya error HTTP
+                    var serverMsg = '';
+                    try {
+                        var resp = JSON.parse(xhr.responseText);
+                        if (resp && resp.data && resp.data.message) {
+                            serverMsg = resp.data.message;
+                        }
+                    } catch(e) {}
+                    
+                    alert('❌ Error de conexión: ' + status + (serverMsg ? '\n\nDetalle: ' + serverMsg : '') + '\n\nRevisa la consola para más detalles.');
+                    currentAlert = null;
                 }
             });
         });
