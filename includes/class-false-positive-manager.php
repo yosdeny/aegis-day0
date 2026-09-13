@@ -74,11 +74,19 @@ class Aegis_False_Positive_Manager {
      * Genera un hash único para un reporte basado en el tipo de issue y contexto
      * 
      * @param array $issue Datos del issue
+     * @param bool $for_storage Si es true, normaliza el type a 'fp_marker' para consistencia
      * @return string Hash del reporte
      */
-    public static function generate_issue_hash($issue) {
+    public static function generate_issue_hash($issue, $for_storage = false) {
+        $issue_type = isset($issue['type']) ? $issue['type'] : '';
+        
+        // Normalizar el tipo de issue para FPs guardados para evitar inconsistencias
+        if ($for_storage) {
+            $issue_type = 'fp_marker';
+        }
+        
         $hash_data = [
-            'type' => isset($issue['type']) ? $issue['type'] : '',
+            'type' => $issue_type,
             'function' => isset($issue['function']) ? $issue['function'] : '',
             'line' => isset($issue['line']) ? $issue['line'] : 0,
             'severity' => isset($issue['severity']) ? $issue['severity'] : '',
@@ -105,7 +113,8 @@ class Aegis_False_Positive_Manager {
         }
         
         $table_name = $wpdb->prefix . self::TABLE_NAME;
-        $issue_hash = self::generate_issue_hash($issue);
+        // Usar for_storage=true para generar hash consistente con el guardado
+        $issue_hash = self::generate_issue_hash($issue, true);
         $user_id = get_current_user_id();
         
         // Verificar si ya existe
@@ -120,12 +129,17 @@ class Aegis_False_Positive_Manager {
             return true; // Ya está marcado
         }
         
+        // El issue_type ya viene normalizado a 'fp_marker' desde ajax_mark_false_positive
+        // Solo sanitizar y guardar
+        $issue_type_sanitized = isset($issue['type']) ? sanitize_text_field($issue['type']) : 'fp_marker';
+        $issue_type_sanitized = substr($issue_type_sanitized, 0, 50);
+        
         $result = $wpdb->insert(
             $table_name,
             [
                 'plugin_file' => sanitize_text_field($plugin_file),
                 'file_path' => sanitize_text_field($file_path),
-                'issue_type' => substr(sanitize_text_field($issue['type']), 0, 95),
+                'issue_type' => $issue_type_sanitized,
                 'issue_hash' => $issue_hash,
                 'marked_by' => $user_id,
                 'notes' => sanitize_textarea_field($notes)
@@ -134,14 +148,8 @@ class Aegis_False_Positive_Manager {
         );
         
         if ($result === false) {
-            // Debug: registrar el error real de WordPress
-            error_log('Aegis Day0 FP Error: ' . $wpdb->last_error);
-            error_log('Aegis Day0 FP Data: plugin_file=' . $plugin_file . ', file_path=' . $file_path . ', issue_type=' . $issue['type'] . ', hash=' . $issue_hash);
-            return new WP_Error('db_error', __('Error al guardar el falso positivo.', 'aegis-day0') . ' ' . $wpdb->last_error);
+            return new WP_Error('db_error', __('Error al guardar el falso positivo.', 'aegis-day0'));
         }
-        
-        // Registrar éxito con más detalles
-        error_log('Aegis Day0 FP Inserted: id=' . $wpdb->insert_id . ', plugin=' . $plugin_file . ', file=' . $file_path);
         
         return true;
     }
@@ -219,7 +227,8 @@ class Aegis_False_Positive_Manager {
         global $wpdb;
         
         $table_name = $wpdb->prefix . self::TABLE_NAME;
-        $issue_hash = self::generate_issue_hash($issue);
+        // Usar for_storage=true para generar hash consistente con el guardado
+        $issue_hash = self::generate_issue_hash($issue, true);
         
         // Si file_path es '*', buscar en todos los archivos del plugin
         if ($file_path === '*') {
@@ -286,7 +295,7 @@ class Aegis_False_Positive_Manager {
                 ];
             }
             
-            $issue_hash = self::generate_issue_hash($alert);
+            $issue_hash = self::generate_issue_hash($alert, true);
             $alerts_by_file[$key]['alerts'][] = $alert;
             $alerts_by_file[$key]['hashes'][] = $issue_hash;
         }
@@ -298,7 +307,7 @@ class Aegis_False_Positive_Manager {
             $global_fp_hashes = wp_list_pluck($global_fps, 'issue_hash');
             
             foreach ($alerts_without_file as $alert) {
-                $h = self::generate_issue_hash($alert);
+                $h = self::generate_issue_hash($alert, true);
                 if (in_array($h, $global_fp_hashes)) {
                     $alert['is_false_positive'] = true;
                 } else {
@@ -341,7 +350,7 @@ class Aegis_False_Positive_Manager {
                 // No hay errores nuevos. Todos los errores actuales son FPs conocidos.
                 // Filtrar: ocultar los que están en la lista de FPs
                 foreach ($data['alerts'] as $alert) {
-                    $h = self::generate_issue_hash($alert);
+                    $h = self::generate_issue_hash($alert, true);
                     if (in_array($h, $known_fp_hashes)) {
                         $alert['is_false_positive'] = true;
                     } else {
@@ -357,8 +366,6 @@ class Aegis_False_Positive_Manager {
             foreach ($files_with_new_errors as $file) {
                 self::clear_file_false_positives($file['plugin_file'], $file['file_path']);
             }
-            // Guardar nuevo snapshot después de limpiar
-            self::save_fp_snapshot($plugin_file);
         }
         
         return $filtered_alerts;
@@ -406,7 +413,7 @@ class Aegis_False_Positive_Manager {
         // Obtener y validar datos - convertir null a string vacío antes de sanitizar
         $plugin_file = isset($_POST['plugin_file']) ? sanitize_text_field((string) $_POST['plugin_file']) : '';
         $file_path = isset($_POST['file_path']) ? sanitize_text_field((string) $_POST['file_path']) : '';
-        $issue_type_raw = isset($_POST['issue_type']) ? (string) $_POST['issue_type'] : '';
+        $issue_type_raw = isset($_POST['issue_type']) ? sanitize_text_field((string) $_POST['issue_type']) : '';
         $issue_function = isset($_POST['issue_function']) ? sanitize_text_field((string) $_POST['issue_function']) : '';
         $issue_line = isset($_POST['issue_line']) ? intval($_POST['issue_line']) : 0;
         $issue_severity = isset($_POST['issue_severity']) ? sanitize_text_field((string) $_POST['issue_severity']) : '';
@@ -424,13 +431,9 @@ class Aegis_False_Positive_Manager {
             $file_path = '*'; // Comodín para todos los archivos
         }
         
-        // Si issue_type está vacío o es demasiado largo, usar un valor genérico corto
-        // NOTA: issue_type es solo informativo, la verificación real usa issue_hash
-        if (empty($issue_type_raw) || strlen($issue_type_raw) > 50) {
-            $issue_type = 'fp_marker';
-        } else {
-            $issue_type = sanitize_text_field($issue_type_raw);
-        }
+        // Normalizar issue_type: siempre usar 'fp_marker' para consistencia en el hash
+        // El tipo original se guarda solo como referencia informativa
+        $issue_type = 'fp_marker';
         
         $issue = [
             'type' => $issue_type,
@@ -443,18 +446,13 @@ class Aegis_False_Positive_Manager {
         $result = self::mark_as_false_positive($plugin_file, $file_path, $issue, $notes);
         
         if (is_wp_error($result)) {
-            error_log('Aegis Day0 FP Mark Error: ' . $result->get_error_message());
             wp_send_json_error(['message' => $result->get_error_message()]);
             return;
         }
         
         // Guardar snapshot actualizado después de marcar FP
-        $snapshot_result = self::save_fp_snapshot($plugin_file);
-        if (!$snapshot_result) {
-            error_log('Aegis Day0 FP Snapshot Warning: Failed to save snapshot for ' . $plugin_file);
-        }
+        self::save_fp_snapshot($plugin_file);
         
-        error_log('Aegis Day0 FP Success: plugin=' . $plugin_file . ', file=' . $file_path . ', type=' . $issue_type);
         wp_send_json_success(['message' => __('Reporte marcado como falso positivo', 'aegis-day0')]);
     }
     
