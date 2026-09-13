@@ -287,7 +287,16 @@ class Aegis_Day0_Scanner {
      */
     private function get_plugin_files($plugin_file) {
         $files = array();
-        $plugin_dir = WP_PLUGIN_DIR . '/' . dirname($plugin_file);
+        
+        // Manejar correctamente plugins de un solo archivo vs directorio
+        $plugin_dir_name = dirname($plugin_file);
+        if ($plugin_dir_name === '.' || $plugin_dir_name === '/') {
+            // Plugin de un solo archivo en la raíz de wp-content/plugins/
+            $plugin_dir = WP_PLUGIN_DIR;
+        } else {
+            // Plugin en su propio directorio
+            $plugin_dir = WP_PLUGIN_DIR . '/' . $plugin_dir_name;
+        }
         
         // Directorios a excluir (evitar cargar librerías de terceros)
         $exclude_dirs = array('vendor', 'node_modules', '.git', 'tests', 'test', 'docs', 'languages', 'bin', 'build');
