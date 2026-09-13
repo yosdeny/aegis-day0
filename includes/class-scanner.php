@@ -289,15 +289,60 @@ class Aegis_Day0_Scanner {
         $files = array();
         $plugin_dir = WP_PLUGIN_DIR . '/' . dirname($plugin_file);
         
+        // Directorios a excluir (evitar cargar librerías de terceros)
+        $exclude_dirs = array('vendor', 'node_modules', '.git', 'tests', 'test', 'docs', 'assets', 'languages');
+        
         if (is_dir($plugin_dir)) {
-            // Ignorar directorios ocultos y vendor si es posible
-            $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($plugin_dir));
-            foreach ($iterator as $file) {
-                if ($file->isFile() && in_array($file->getExtension(), array('php', 'js', 'html'))) {
-                    $full_path = $file->getPathname();
-                    $relative = str_replace(WP_PLUGIN_DIR . '/', '', $full_path);
-                    $files[] = str_replace('\\', '/', $relative);
+            try {
+                $iterator = new RecursiveIteratorIterator(
+                    new RecursiveDirectoryIterator($plugin_dir, RecursiveDirectoryIterator::SKIP_DOTS),
+                    RecursiveIteratorIterator::SELF_FIRST
+                );
+                
+                foreach ($iterator as $file) {
+                    if ($file->isFile()) {
+                        // Solo archivos PHP
+                        if ($file->getExtension() !== 'php') {
+                            continue;
+                        }
+                        
+                        $full_path = $file->getPathname();
+                        $relative_path = str_replace(WP_PLUGIN_DIR . '/', '', $full_path);
+                        
+                        // Excluir directorios problemáticos (verificar en cualquier parte de la ruta)
+                        $skip = false;
+                        $path_parts = explode('/', str_replace('\\', '/', $relative_path));
+                        foreach ($path_parts as $part) {
+                            if (in_array(strtolower($part), $exclude_dirs)) {
+                                $skip = true;
+                                break;
+                            }
+                        }
+                        
+                        if ($skip) {
+                            continue;
+                        }
+                        
+                        // Excluir archivos muy grandes (> 100KB)
+                        if ($file->getSize() > 100000) {
+                            continue;
+                        }
+                        
+                        // Excluir plugins conocidos de gran tamaño
+                        if (strpos($relative_path, 'woocommerce/') !== false || 
+                            strpos($relative_path, 'elementor/') !== false ||
+                            strpos($relative_path, 'jetpack/') !== false ||
+                            strpos($relative_path, 'wpbakery/') !== false) {
+                            continue;
+                        }
+                        
+                        $files[] = str_replace('\\', '/', $relative_path);
+                    }
                 }
+            } catch (Exception $e) {
+                // Si falla el iterator, usar solo el archivo principal
+                error_log('Aegis: Error scanning directory for ' . $plugin_file . ': ' . $e->getMessage());
+                $files[] = $plugin_file;
             }
         } else {
             // Plugin de un solo archivo
