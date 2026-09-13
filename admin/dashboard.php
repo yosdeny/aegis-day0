@@ -246,6 +246,7 @@ function aegis_day0_dashboard_page() {
             console.log('Todos los data attributes:', $btn.data());
             
             currentAlert = {
+                $button: $btn,
                 plugin_file: pluginFile,
                 file_path: filePath,
                 issue_type: issueType,
@@ -324,11 +325,20 @@ function aegis_day0_dashboard_page() {
                     console.log('Response:', response);
                     
                     if (response.success) {
-                        alert('✅ ' + response.data.message);
+                        // Cerrar modal
                         $('#aegis-fp-modal').fadeOut();
                         $('#aegis-fp-notes').val('');
+                        
+                        // Actualizar UI sin recargar
+                        var $row = currentAlert.$button.closest('tr');
+                        var $actionsCell = $row.find('td:last-child');
+                        
+                        // Cambiar botón por texto de confirmado
+                        $actionsCell.html('<span style="color: #666; font-style: italic;">✅ Marcado como FP</span>');
+                        $row.css('background-color', '#f0f0f1').css('opacity', '0.7');
+                        
+                        alert('✅ ' + response.data.message);
                         currentAlert = null;
-                        location.reload();
                     } else {
                         var errorMsg = response.data?.message || 'Error desconocido';
                         console.error('❌ Error del servidor:', errorMsg);
