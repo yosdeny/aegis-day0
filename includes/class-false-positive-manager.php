@@ -238,8 +238,7 @@ class Aegis_False_Positive_Manager {
         
         // Si file_path es '*', buscar en todos los archivos del plugin
         if ($file_path === '*') {
-            $prepared_query = GRM_Query_Validator::safe_prepare(
-                $wpdb,
+            $prepared_query = $wpdb->prepare(
                 "SELECT id FROM $table_name 
                  WHERE plugin_file = %s AND issue_hash = %s",
                 $plugin_file,
@@ -247,8 +246,7 @@ class Aegis_False_Positive_Manager {
             );
             $exists = $wpdb->get_var($prepared_query);
         } else {
-            $prepared_query = GRM_Query_Validator::safe_prepare(
-                $wpdb,
+            $prepared_query = $wpdb->prepare(
                 "SELECT id FROM $table_name 
                  WHERE plugin_file = %s AND file_path = %s AND issue_hash = %s",
                 $plugin_file,
