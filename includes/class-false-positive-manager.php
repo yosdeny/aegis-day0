@@ -134,7 +134,10 @@ class Aegis_False_Positive_Manager {
         );
         
         if ($result === false) {
-            return new WP_Error('db_error', __('Error al guardar el falso positivo.', 'aegis-day0'));
+            // Debug: registrar el error real de WordPress
+            error_log('Aegis Day0 FP Error: ' . $wpdb->last_error);
+            error_log('Aegis Day0 FP Data: plugin_file=' . $plugin_file . ', file_path=' . $file_path . ', issue_type=' . $issue['type']);
+            return new WP_Error('db_error', __('Error al guardar el falso positivo.', 'aegis-day0') . ' ' . $wpdb->last_error);
         }
         
         return true;
