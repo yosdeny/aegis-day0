@@ -117,13 +117,15 @@ class Aegis_False_Positive_Manager {
         $issue_hash = self::generate_issue_hash($issue, true);
         $user_id = get_current_user_id();
         
-        // Verificar si ya existe
-        $exists = $wpdb->get_var($wpdb->prepare(
+        // Verificar si ya existe (usando validador para detectar errores de marcadores)
+        $prepared_query = GRM_Query_Validator::safe_prepare(
+            $wpdb,
             "SELECT id FROM $table_name WHERE plugin_file = %s AND file_path = %s AND issue_hash = %s",
             $plugin_file,
             $file_path,
             $issue_hash
-        ));
+        );
+        $exists = $wpdb->get_var($prepared_query);
         
         if ($exists) {
             return true; // Ya está marcado
@@ -190,22 +192,26 @@ class Aegis_False_Positive_Manager {
         
         // Si file_path es '*' o null, obtener todos los FPs del plugin
         if ($file_path === null || $file_path === '*') {
-            $results = $wpdb->get_results($wpdb->prepare(
+            $prepared_query = GRM_Query_Validator::safe_prepare(
+                $wpdb,
                 "SELECT issue_hash, issue_type, file_path, marked_at, notes 
                  FROM $table_name 
                  WHERE plugin_file = %s
                  ORDER BY marked_at DESC",
                 $plugin_file
-            ), ARRAY_A);
+            );
+            $results = $wpdb->get_results($prepared_query, ARRAY_A);
         } else {
-            $results = $wpdb->get_results($wpdb->prepare(
+            $prepared_query = GRM_Query_Validator::safe_prepare(
+                $wpdb,
                 "SELECT issue_hash, issue_type, marked_at, notes 
                  FROM $table_name 
                  WHERE plugin_file = %s AND file_path = %s
                  ORDER BY marked_at DESC",
                 $plugin_file,
                 $file_path
-            ), ARRAY_A);
+            );
+            $results = $wpdb->get_results($prepared_query, ARRAY_A);
         }
         
         if (!$results) {
@@ -232,20 +238,24 @@ class Aegis_False_Positive_Manager {
         
         // Si file_path es '*', buscar en todos los archivos del plugin
         if ($file_path === '*') {
-            $exists = $wpdb->get_var($wpdb->prepare(
+            $prepared_query = GRM_Query_Validator::safe_prepare(
+                $wpdb,
                 "SELECT id FROM $table_name 
                  WHERE plugin_file = %s AND issue_hash = %s",
                 $plugin_file,
                 $issue_hash
-            ));
+            );
+            $exists = $wpdb->get_var($prepared_query);
         } else {
-            $exists = $wpdb->get_var($wpdb->prepare(
+            $prepared_query = GRM_Query_Validator::safe_prepare(
+                $wpdb,
                 "SELECT id FROM $table_name 
                  WHERE plugin_file = %s AND file_path = %s AND issue_hash = %s",
                 $plugin_file,
                 $file_path,
                 $issue_hash
-            ));
+            );
+            $exists = $wpdb->get_var($prepared_query);
         }
         
         return (bool) $exists;
@@ -484,10 +494,12 @@ class Aegis_False_Positive_Manager {
         // Obtener el plugin_file para actualizar el snapshot
         global $wpdb;
         $table_name = $wpdb->prefix . self::TABLE_NAME;
-        $plugin_file = $wpdb->get_var($wpdb->prepare(
+        $prepared_query = GRM_Query_Validator::safe_prepare(
+            $wpdb,
             "SELECT plugin_file FROM $table_name WHERE id = %d",
             $fp_id
-        ));
+        );
+        $plugin_file = $wpdb->get_var($prepared_query);
         
         // Actualizar snapshot si tenemos el plugin_file
         if ($plugin_file) {
@@ -543,10 +555,12 @@ class Aegis_False_Positive_Manager {
         
         // 1. Obtener solo los hashes de los FPs actuales para este plugin
         $table_name = $wpdb->prefix . self::TABLE_NAME;
-        $fps = $wpdb->get_col($wpdb->prepare(
+        $prepared_query = GRM_Query_Validator::safe_prepare(
+            $wpdb,
             "SELECT issue_hash FROM $table_name WHERE plugin_file = %s ORDER BY issue_hash",
             $plugin_file
-        ));
+        );
+        $fps = $wpdb->get_col($prepared_query);
 
         // 2. Guardar directamente el array de hashes (serializado por WP)
         $option_name = 'aegis_day0_fp_log_' . md5($plugin_file);
@@ -591,10 +605,12 @@ class Aegis_False_Positive_Manager {
         
         // Obtener estado actual directamente de la BD (solo hashes)
         $table_name = $wpdb->prefix . self::TABLE_NAME;
-        $current_log = $wpdb->get_col($wpdb->prepare(
+        $prepared_query = GRM_Query_Validator::safe_prepare(
+            $wpdb,
             "SELECT issue_hash FROM $table_name WHERE plugin_file = %s ORDER BY issue_hash",
             $plugin_file
-        ));
+        );
+        $current_log = $wpdb->get_col($prepared_query);
         
         if (!is_array($current_log)) {
             $current_log = [];
