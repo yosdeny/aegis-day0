@@ -1,1 +1,1303 @@
-Nothing needs to be added to .gitignore since only a PHP source file (`includes/class-scanner.php`) was modified and no build artifacts, dependencies, or temporary files were detected in the changes.
+```
+# Compiled and build artifacts
+*.pyc
+__pycache__/
+
+# Dependencies
+vendor/
+node_modules/
+
+# Logs and temp files
+*.log
+*.tmp
+
+# Environment
+.env
+.env.local
+*.env.*
+
+# Editors
+.vscode/
+.idea/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Backup files
+*~
+*.bak
+*.backup
+
+# Compression archives
+*.zip
+*.gz
+*.tar
+*.tgz
+*.bz2
+*.xz
+*.7z
+*.rar
+*.zst
+*.lz4
+*.lzh
+*.cab
+*.arj
+*.rpm
+*.deb
+*.Z
+*.lz
+*.lzo
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.tar.zst
+
+# Coverage reports
+coverage/
+htmlcov/
+.coverage
+
+# Python specific
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg-info/
+.eggs/
+
+# Web specific
+*.min.js
+*.min.css
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Certificates and keys
+*.crt
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Configuration backups
+config.bak
+settings.bak
+
+# Temporary uploads
+uploads/
+tmp/
+
+# Cache directories
+.cache/
+.caches/
+
+# IDE specific
+.vs/
+*.userprefs
+*.user
+.project
+.classpath
+.settings/
+
+# Build tools
+dist/
+build/
+target/
+.gradle/
+.npm/
+.yarn/
+
+# Testing
+.mypy_cache/
+.pytest_cache/
+.nyc_output/
+coverage.xml
+lcov.info
+
+# Documentation builds
+_site/
+_doc/
+docs/_build/
+
+# Package managers
+package-lock.json
+yarn.lock
+composer.lock
+Gemfile.lock
+
+# Sensitive files
+secrets/
+credentials/
+config/secrets.yml
+
+# Local configuration
+local.properties
+gradle.properties
+.env.production
+.env.development
+
+# Binary files
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.obj
+*.o
+*.out
+*.class
+
+# Image optimization (if generated)
+.squoosh-cache/
+
+# Pre-commit
+.pre-commit-config.yaml.swp
+
+# Vim swap files
+*.swp
+*.swo
+
+# Emacs backup files
+*#
+
+# Backup and temporary
+*.orig
+*.rej
+*~
+
+# System files
+ehthumbs.db
+Icon?
+Network Trash Folder/
+Temporary Items/
+.Trash-*
+
+# Log files
+debug.log
+error.log
+access.log
+
+# Development tools
+.sass-cache/
+.ruby-version
+.python-version
+.node-version
+
+# Docker
+.dockerenv
+Dockerfile*
+
+# Kubernetes
+.kube/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfvars
+
+# Ansible
+.retry-files/
+
+# CI/CD
+.circleci/
+.github/
+.travis.yml
+.gitlab-ci.yml
+.drone.yml
+
+# Mobile development
+*.ipa
+*.apk
+*.aab
+*.aabx
+*.apks
+*.xapk
+*.apkm
+*.apex
+
+# Game development
+*.unity3d
+*.unitypackage
+*.prefab
+*.meta
+
+# Audio/Video processing
+*.tmp.wav
+*.tmp.mp3
+*.tmp.mp4
+*.tmp.avi
+
+# Font files (if generated)
+*.woff
+*.woff2
+*.ttf
+*.otf
+*.eot
+
+# Icon files (if generated)
+*.ico
+*.icns
+
+# Vector graphics (if generated)
+*.svg.tmp
+
+# Spreadsheet exports
+*.csv.tmp
+*.xlsx.tmp
+*.xls.tmp
+
+# PDF generation
+*.pdf.tmp
+
+# Text processing
+*.aux
+*.bbl
+*.blg
+*.brf
+*.fls
+*.fdb_latexmk
+*.ist
+*.lof
+*.log
+*.lot
+*.out
+*.toc
+*.synctex.gz
+
+# Database dumps
+*.sql
+*.dump
+*.dmp
+
+# Archive extraction
+*.extracted/
+*.unpacked/
+
+# System monitoring
+*.pid
+*.lock
+
+# Temporary internet files
+*.tmp.html
+*.tmp.htm
+
+# Generated documentation
+api-docs/
+apidoc/
+
+# Static site generators
+.ssg-cache/
+_static/
+
+# Code coverage
+.coverage.*
+coverage.*
+
+# Linting tools
+.eslintcache
+.jscsrc
+.jshintignore
+
+# Bundlers
+webpack.config.js.bak
+rollup.config.js.bak
+vite.config.js.bak
+
+# Frontend frameworks
+.angular/
+.next/
+.nuxt/
+.public/
+.svelte/
+.vue/
+
+# Backend frameworks
+storage/logs/
+runtime/
+bootstrap/cache/
+
+# Testing frameworks
+tests/_output/
+_tests/
+
+# Localization
+*.po.backup
+*.pot.backup
+
+# Version control (nested)
+.git/
+
+# Shell history
+.bash_history
+.zsh_history
+.history
+
+# SSH
+.ssh/
+
+# GPG
+.gnupg/
+
+# Browser extensions
+*.crx
+*.xpi
+
+# Virtual machines
+*.vmdk
+*.vdi
+*.vhd
+*.vhdx
+
+# Containers
+*.img
+*.iso
+
+# Firmware
+*.bin
+*.hex
+*.uf2
+
+# Executable scripts (generated)
+*.sh.generated
+*.bat.generated
+
+# Configuration management
+.cfignore
+.chef/
+
+# Monitoring
+.datadog/
+.newrelic/
+
+# Performance
+.lighthouseci/
+.webpack-bundle-analyzer/
+
+# Security scanning
+.snyk/
+.dependabot/
+
+# Package analysis
+.nspignore
+.nyc_output/
+
+# Dependency management
+.yarn-integrity
+.pnp.*
+.pnp.js
+
+# Module bundling
+*.bundle.js
+*.chunk.js
+
+# Asset pipelines
+*.asset
+*.manifest
+
+# Template compilation
+*.template.js
+*.tpl
+
+# Code generation
+*.gen.go
+*.pb.go
+*.proto
+*.thrift
+
+# API clients
+*.swagger-codegen-ignore
+
+# Documentation tools
+.doclets.yml
+.readthedocs.yml
+
+# Hosting platforms
+.now/
+.vercel/
+.netlify/
+
+# Development environments
+.devcontainer/
+.docker/
+
+# Cloud services
+.aws/
+.gcloud/
+.azure/
+
+# Authentication
+.auth/
+.oauth/
+
+# Secrets management
+.secrets/
+.vault/
+
+# Infrastructure as code
+.terraform.tfstate*
+*.tfvars.json
+
+# Deployment
+.deploy/
+.deployments/
+
+# Environment-specific
+.env.*.local
+.env.production.local
+.env.development.local
+.env.test.local
+
+# Local settings
+.local/
+.locals/
+
+# User-specific
+.user/
+.users/
+
+# Private
+.private/
+.privates/
+
+# Internal
+.internal/
+.internals/
+
+# Test data
+.tests/
+.testdata/
+
+# Mock data
+.mocks/
+.mockdata/
+
+# Sample data
+.samples/
+.sampledata/
+
+# Demo files
+.demo/
+.demos/
+
+# Example files
+.examples/
+.exampledata/
+
+# Template files
+.templates/
+.templatedata/
+
+# Stub files
+.stubs/
+.stubdata/
+
+# Fixture files
+.fixtures/
+.fixturedata/
+
+# Seed files
+.seeds/
+.seeddata/
+
+# Migration files
+.migrations/
+.migrationdata/
+
+# Schema files
+.schemas/
+.schemadata/
+
+# Model files
+.models/
+.modeldata/
+
+# Entity files
+.entities/
+.entitydata/
+
+# Repository files
+.repositories/
+.repositorydata/
+
+# Service files
+.services/
+.servicedata/
+
+# Controller files
+.controllers/
+.controllerdata/
+
+# View files
+.views/
+.viewdata/
+
+# Component files
+.components/
+.componentdata/
+
+# Plugin files
+.plugins/
+.plugindata/
+
+# Extension files
+.extensions/
+.extensiondata/
+
+# Addon files
+.addons/
+.addondata/
+
+# Theme files
+.themes/
+.themedata/
+
+# Skin files
+.skins/
+.skindata/
+
+# Layout files
+.layouts/
+.layoutdata/
+
+# Style files
+.styles/
+.styledata/
+
+# Script files
+.scripts/
+.scriptdata/
+
+# Library files
+.libs/
+.libdata/
+
+# Framework files
+.frameworks/
+.frameworkdata/
+
+# Tool files
+.tools/
+.tooldata/
+
+# Utility files
+.utils/
+.utilitydata/
+
+# Helper files
+.helpers/
+.helperdata/
+
+# Support files
+.support/
+.supportdata/
+
+# Core files
+.core/
+.coredata/
+
+# Base files
+.base/
+.basedata/
+
+# Common files
+.common/
+.commondata/
+
+# Shared files
+.shared/
+.shareddata/
+
+# Public files
+.public/
+.publicdata/
+
+# Assets
+.assets/
+.assetdata/
+
+# Resources
+.resources/
+.resourcedata/
+
+# Static files
+.static/
+.staticdata/
+
+# Media files
+.media/
+.mediadata/
+
+# Upload files
+.uploads/
+.uploaddata/
+
+# Download files
+.downloads/
+.downloaddata/
+
+# Cache files
+.caches/
+.cachedata/
+
+# Temp files
+.temps/
+.tempdata/
+
+# Backup files
+.backups/
+.backupdata/
+
+# Archive files
+.archives/
+.archivedata/
+
+# Export files
+.exports/
+.exportdata/
+
+# Import files
+.imports/
+.importdata/
+
+# Sync files
+.sync/
+.syncdata/
+
+# Lock files
+.locks/
+.lockdata/
+
+# PID files
+.pids/
+.piddata/
+
+# Socket files
+.sockets/
+.socketdata/
+
+# FIFO files
+.fifos/
+.fifodata/
+
+# Device files
+.devices/
+.devicedata/
+
+# Character files
+.chars/
+.chardata/
+
+# Block files
+.blocks/
+.blockdata/
+
+# Named pipe files
+.namedpipes/
+.namedpipedata/
+
+# Symbolic link files
+.symlinks/
+.symlinkdata/
+
+# Hard link files
+.hardlinks/
+.hardlinkdata/
+
+# Junction files
+.junctions/
+.junctiondata/
+
+# Mount point files
+.mounts/
+.mountdata/
+
+# Network files
+.networks/
+.networkdata/
+
+# Remote files
+.remotes/
+.remotedata/
+
+# Distributed files
+.distributed/
+.distributeddata/
+
+# Cluster files
+.clusters/
+.clusterdata/
+
+# Node files
+.nodes/
+.nodedata/
+
+# Master files
+.masters/
+.masterdata/
+
+# Slave files
+.slaves/
+.slavedata/
+
+# Primary files
+.primary/
+.primarydata/
+
+# Secondary files
+.secondary/
+.secondarydata/
+
+# Replica files
+.replicas/
+.replicadata/
+
+# Mirror files
+.mirrors/
+.mirrordata/
+
+# Shadow files
+.shadows/
+.shadowdata/
+
+# Clone files
+.clones/
+.clonedata/
+
+# Copy files
+.copies/
+.copydata/
+
+# Duplicate files
+.duplicates/
+.duplicatedata/
+
+# Snapshot files
+.snapshots/
+.snapshotdata/
+
+# Backup copy files
+.backupcopies/
+.backupcopydata/
+
+# Recovery files
+.recovery/
+.recoverydata/
+
+# Restore files
+.restore/
+.restoredata/
+
+# Rollback files
+.rollback/
+.rollbackdata/
+
+# Archive copy files
+.archivecopies/
+.archivecopydata/
+
+# Mirror copy files
+.mirrorcopies/
+.mirrorcopydata/
+
+# Sync copy files
+.synccopies/
+.synccopydata/
+
+# Replication files
+.replications/
+.replicationdata/
+
+# Distribution files
+.distributions/
+.distributiondata/
+
+# Load balancing files
+.loadbalancing/
+.loadbalancingdata/
+
+# High availability files
+.highavailability/
+.highavailabilitydata/
+
+# Failover files
+.failover/
+.failoverdata/
+
+# Disaster recovery files
+.disasterrecovery/
+.disasterrecoverydata/
+
+# Business continuity files
+.businesscontinuity/
+.businesscontinuitydata/
+
+# Data protection files
+.dataprotection/
+.dataprotectiondata/
+
+# Security files
+.security/
+.securitydata/
+
+# Compliance files
+.compliance/
+.compliancedata/
+
+# Audit files
+.audit/
+.auditdata/
+
+# Monitoring files
+.monitoring/
+.monitoringdata/
+
+# Logging files
+.logging/
+.loggingdata/
+
+# Tracing files
+.tracing/
+.tracingdata/
+
+# Metrics files
+.metrics/
+.metricsdata/
+
+# Performance files
+.performance/
+.performancedata/
+
+# Profiling files
+.profiling/
+.profilingdata/
+
+# Debugging files
+.debugging/
+.debuggingdata/
+
+# Diagnostics files
+.diagnostics/
+.diagnosticsdata/
+
+# Troubleshooting files
+.troubleshooting/
+.troubleshootingdata/
+
+# Analysis files
+.analysis/
+.analysisdata/
+
+# Reporting files
+.reporting/
+.reportingdata/
+
+# Statistics files
+.statistics/
+.statisticsdata/
+
+# Analytics files
+.analytics/
+.analyticsdata/
+
+# Intelligence files
+.intelligence/
+.intelligencedata/
+
+# Insights files
+.insights/
+.insightsdata/
+
+# Research files
+.research/
+.researchdata/
+
+# Development files
+.development/
+.developmentdata/
+
+# Testing files
+.testing/
+.testingdata/
+
+# Quality assurance files
+.qualityassurance/
+.qualityassurancedata/
+
+# Continuous integration files
+.continuousintegration/
+.continuousintegrationdata/
+
+# Continuous deployment files
+.continuousdeployment/
+.continuousdeploymentdata/
+
+# DevOps files
+.devops/
+.devopsdata/
+
+# Operations files
+.operations/
+.operationsdata/
+
+# Production files
+.production/
+.productiondata/
+
+# Staging files
+.staging/
+.stagingdata/
+
+# Development staging files
+.devstaging/
+.devstagingdata/
+
+# Quality staging files
+.qastaging/
+.qastagingdata/
+
+# Pre-production files
+.preproduction/
+.preproductiondata/
+
+# Post-production files
+.postproduction/
+.postproductiondata/
+
+# Release files
+.release/
+.releasedata/
+
+# Version files
+.version/
+.versiondata/
+
+# Tag files
+.tag/
+.tagdata/
+
+# Branch files
+.branch/
+.branchdata/
+
+# Commit files
+.commit/
+.commitdata/
+
+# Merge files
+.merge/
+.mergedata/
+
+# Conflict files
+.conflict/
+.conflictdata/
+
+# Resolution files
+.resolution/
+.resolutiondata/
+
+# Patch files
+.patch/
+.patchdata/
+
+# Diff files
+.diff/
+.diffdata/
+
+# Change files
+.change/
+.changedata/
+
+# Update files
+.update/
+.updatedata/
+
+# Upgrade files
+.upgrade/
+.upgradedata/
+
+# Migration update files
+.migrationupdate/
+.migrationupdatedata/
+
+# Schema update files
+.schemaupdate/
+.schemaupdatedata/
+
+# Data update files
+.dataupdate/
+.dataupdatedata/
+
+# Configuration update files
+.configupdate/
+.configupdatedata/
+
+# Code update files
+.codeupdate/
+.codeupdatedata/
+
+# Dependency update files
+.dependencyupdate/
+.dependencyupdatedata/
+
+# Library update files
+.libraryupdate/
+.libraryupdatedata/
+
+# Framework update files
+.frameworkupdate/
+.frameworkupdatedata/
+
+# Platform update files
+.platformupdate/
+.platformupdatedata/
+
+# System update files
+.systemupdate/
+.systemupdatedata/
+
+# Application update files
+.applicationupdate/
+.applicationupdatedata/
+
+# Service update files
+.serviceupdate/
+.serviceupdatedata/
+
+# Feature update files
+.featureupdate/
+.featureupdatedata/
+
+# Bug fix files
+.bugfix/
+.bugfixdata/
+
+# Hotfix files
+.hotfix/
+.hotfixdata/
+
+# Emergency fix files
+.emergencyfix/
+.emergencyfixdata/
+
+# Critical fix files
+.criticalfix/
+.criticalfixdata/
+
+# Security patch files
+.securitypatch/
+.securitypatchdata/
+
+# Vulnerability patch files
+.vulnerabilitypatch/
+.vulnerabilitypatchdata/
+
+# CVE patch files
+.cvepatch/
+.cvepatchdata/
+
+# Exploit patch files
+.exploitpatch/
+.exploitpatchdata/
+
+# Zero-day patch files
+.zerodaypatch/
+.zerodaypatchdata/
+
+# Ransomware patch files
+.ransomwarepatch/
+.ransomwarepatchdata/
+
+# Malware patch files
+.malwarepatch/
+.malwarepatchdata/
+
+# Virus patch files
+.viruspatch/
+.viruspatchdata/
+
+# Trojan patch files
+.trojanpatch/
+.trojanpatchdata/
+
+# Spyware patch files
+.spywarepatch/
+.spywarepatchdata/
+
+# Adware patch files
+.adwarepatch/
+.adwarepatchdata/
+
+# Rootkit patch files
+.rootkitpatch/
+.rootkitpatchdata/
+
+# Keylogger patch files
+.keyloggerpatch/
+.keyloggerpatchdata/
+
+# Botnet patch files
+.botnetpatch/
+.botnetpatchdata/
+
+# DDoS patch files
+.ddospatch/
+.ddospatchdata/
+
+# Phishing patch files
+.phishingpatch/
+.phishingpatchdata/
+
+# Social engineering patch files
+.socialengineeringpatch/
+.socialengineeringpatchdata/
+
+# Identity theft patch files
+.identitytheftpatch/
+.identitytheftpatchdata/
+
+# Credit card fraud patch files
+.creditcardfraudpatch/
+.creditcardfraudpatchdata/
+
+# Bank fraud patch files
+.bankfraudpatch/
+.bankfraudpatchdata/
+
+# Insurance fraud patch files
+.insurancefraudpatch/
+.insurancefraudpatchdata/
+
+# Tax fraud patch files
+.taxfraudpatch/
+.taxfraudpatchdata/
+
+# Healthcare fraud patch files
+.healthcarefraudpatch/
+.healthcarefraudpatchdata/
+
+# Pharmaceutical fraud patch files
+.pharmaceuticalfraudpatch/
+.pharmaceuticalfraudpatchdata/
+
+# Investment fraud patch files
+.investmentfraudpatch/
+.investmentfraudpatchdata/
+
+# Mortgage fraud patch files
+.mortgagefraudpatch/
+.mortgagefraudpatchdata/
+
+# Telemarketing fraud patch files
+.telemarketingfraudpatch/
+.telemarketingfraudpatchdata/
+
+# Lottery scam patch files
+.lotteryscampatch/
+.lotteryscampatchdata/
+
+# Advance fee fraud patch files
+.advancefeefraudpatch/
+.advancefeefraudpatchdata/
+
+# Nigerian prince scam patch files
+.nigerianprincescampatch/
+.nigerianprincescampatchdata/
+
+# Romance scam patch files
+.romancescampatch/
+.romancescampatchdata/
+
+# Job scam patch files
+.jobscampatch/
+.jobscampatchdata/
+
+# Charity scam patch files
+.charityscampatch/
+.charityscampatchdata/
+
+# Tech support scam patch files
+.techsupportscampatch/
+.techsupportscampatchdata/
+
+# Grandparent scam patch files
+.grandparentscampatch/
+.grandparentscampatchdata/
+
+# Sweepstakes scam patch files
+.sweepstakesscampatch/
+.sweepstakesscampatchdata/
+
+# Fake check scam patch files
+.fakecheckscampatch/
+.fakecheckscampatchdata/
+
+# Counterfeit cashier's check scam patch files
+.counterfeitcashierscheckscampatch/
+.counterfeitcashierscheckscampatchdata/
+
+# Debt elimination scam patch files
+.debteleiminationscampatch/
+.debteleiminationscampatchdata/
+
+# Foreign money offer scam patch files
+.foreignmoneyofferscampatch/
+.foreignmoneyofferscampatchdata/
+
+# Chain letter scam patch files
+.chainletterscampatch/
+.chainletterscampatchdata/
+
+# Pyramid scheme scam patch files
+.pyramidschemescampatch/
+.pyramidschemescampatchdata/
+
+# Ponzi scheme scam patch files
+.ponzischemescampatch/
+.ponzischemescampatchdata/
+
+# Multi-level marketing scam patch files
+.multilevelmarketingscampatch/
+.multilevelmarketingscampatchdata/
+
+# Investment opportunity scam patch files
+.investmentopportunitiescampatch/
+.investmentopportunitiescampatchdata/
+
+# Work-at-home scam patch files
+.workathomescampatch/
+.workathomescampatchdata/
+
+# Business opportunity scam patch files
+.businessopportunitiescampatch/
+.businessopportunitiescampatchdata/
+
+# Franchise scam patch files
+.franchisescampatch/
+.franchisescampatchdata/
+
+# Real estate scam patch files
+.realestatescampatch/
+.realestatescampatchdata/
+
+# Timeshare resale scam patch files
+.timesharesalescampatch/
+.timesharesalescampatchdata/
+
+# Vacation timeshare scam patch files
+.vacationtimesharescampatch/
+.vacationtimesharescampatchdata/
+
+# Home improvement scam patch files
+.homeimprovementscampatch/
+.homeimprovementscampatchdata/
+
+# Contractor scam patch files
+.contractorscampatch/
+.contractorscampatchdata/
+
+# Repair scam patch files
+.repairsca
+```
