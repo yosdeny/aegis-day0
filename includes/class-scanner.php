@@ -152,7 +152,35 @@ class Aegis_Day0_Scanner {
         }
 
         // Filtrar falsos positivos ANTES de retornar al dashboard
-        return $this->false_positive_manager->filter_alerts($results, $plugin_file);
+        // Convertir estructura por severidad a array plano para filtrar falsos positivos
+        $flat_alerts = array();
+        foreach ($results as $severity => $alerts) {
+            foreach ($alerts as $alert) {
+                $alert['severity'] = ucfirst($severity);
+                $flat_alerts[] = $alert;
+            }
+        }
+        
+        // Filtrar falsos positivos
+        $filtered_alerts = $this->false_positive_manager->filter_alerts($flat_alerts, $plugin_file);
+        
+        // Volver a convertir a estructura por severidad
+        $final_results = array(
+            'critical' => array(),
+            'high' => array(),
+            'medium' => array(),
+            'low' => array(),
+            'info' => array()
+        );
+        
+        foreach ($filtered_alerts as $alert) {
+            $severity = strtolower(isset($alert['severity']) ? $alert['severity'] : 'info');
+            if (isset($final_results[$severity])) {
+                $final_results[$severity][] = $alert;
+            }
+        }
+
+        return $final_results;
     }
 
     /**
