@@ -33,6 +33,7 @@ require_once AEGIS_DAY0_PLUGIN_DIR . 'includes/notify.php';
 require_once AEGIS_DAY0_PLUGIN_DIR . 'includes/logger.php';
 require_once AEGIS_DAY0_PLUGIN_DIR . 'includes/reports.php';
 require_once AEGIS_DAY0_PLUGIN_DIR . 'includes/class-false-positive-manager.php';
+require_once AEGIS_DAY0_PLUGIN_DIR . 'includes/class-query-validator.php'; // Validador de consultas wpdb
 require_once AEGIS_DAY0_PLUGIN_DIR . 'admin/dashboard.php';
 
 // Enqueue admin styles
