@@ -345,7 +345,8 @@ class Aegis_Day0_Scanner {
                 'function' => isset($alert['function']) ? $alert['function'] : '',
                 'line' => isset($alert['line']) ? $alert['line'] : 0,
                 'context' => isset($alert['context']) ? $alert['context'] : '',
-                'recommendation' => isset($alert['recommendation']) ? $alert['recommendation'] : ''
+                'recommendation' => isset($alert['recommendation']) ? $alert['recommendation'] : '',
+                'file_path' => isset($alert['file_path']) ? $alert['file_path'] : ''
             ];
         }
         
@@ -388,7 +389,8 @@ class Aegis_Day0_Scanner {
                 'function' => isset($alert['function']) ? $alert['function'] : '',
                 'line' => isset($alert['line']) ? $alert['line'] : 0,
                 'description' => isset($alert['description']) ? $alert['description'] : '',
-                'recommendation' => isset($alert['recommendation']) ? $alert['recommendation'] : ''
+                'recommendation' => isset($alert['recommendation']) ? $alert['recommendation'] : '',
+                'file_path' => isset($alert['file_path']) ? $alert['file_path'] : ''
             ];
         }
 
