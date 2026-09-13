@@ -77,13 +77,27 @@ class Aegis_False_Positive_Manager {
      * @return string Hash del reporte
      */
     public static function generate_issue_hash($issue) {
-        $hash_data = [
-            'type' => isset($issue['type']) ? $issue['type'] : '',
-            'function' => isset($issue['function']) ? $issue['function'] : '',
-            'line' => isset($issue['line']) ? $issue['line'] : 0,
-            'severity' => isset($issue['severity']) ? $issue['severity'] : '',
-            'source' => isset($issue['source']) ? $issue['source'] : ''
-        ];
+        // Normalizar datos para garantizar consistencia entre guardado y verificación
+        $type = isset($issue['type']) ? $issue['type'] : '';
+        
+        // Si el tipo es muy largo o es 'fp_marker', usar solo los datos estructurales
+        // Esto evita problemas de inconsistencia entre el guardado y la verificación
+        if (strlen($type) > 50 || $type === 'fp_marker') {
+            $hash_data = [
+                'function' => isset($issue['function']) ? $issue['function'] : '',
+                'line' => isset($issue['line']) ? (int) $issue['line'] : 0,
+                'severity' => isset($issue['severity']) ? $issue['severity'] : '',
+                'source' => isset($issue['source']) ? $issue['source'] : ''
+            ];
+        } else {
+            $hash_data = [
+                'type' => substr($type, 0, 50),
+                'function' => isset($issue['function']) ? $issue['function'] : '',
+                'line' => isset($issue['line']) ? (int) $issue['line'] : 0,
+                'severity' => isset($issue['severity']) ? $issue['severity'] : '',
+                'source' => isset($issue['source']) ? $issue['source'] : ''
+            ];
+        }
         
         return md5(serialize($hash_data));
     }
@@ -424,9 +438,9 @@ class Aegis_False_Positive_Manager {
             $file_path = '*'; // Comodín para todos los archivos
         }
         
-        // Si issue_type está vacío o es demasiado largo, usar un valor genérico corto
+        // Si issue_type está vacío, usar un valor genérico corto
         // NOTA: issue_type es solo informativo, la verificación real usa issue_hash
-        if (empty($issue_type_raw) || strlen($issue_type_raw) > 50) {
+        if (empty($issue_type_raw)) {
             $issue_type = 'fp_marker';
         } else {
             $issue_type = sanitize_text_field($issue_type_raw);

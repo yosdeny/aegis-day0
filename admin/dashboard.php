@@ -250,7 +250,7 @@ function aegis_day0_dashboard_page() {
                     nonce: '<?php echo wp_create_nonce('aegis_day0_nonce'); ?>',
                     plugin_file: pluginFile,
                     file_path: filePath,
-                    issue_type: issueType.substring(0, 95),
+                    issue_type: issueType,
                     issue_function: issueFunction,
                     issue_line: parseInt(issueLine) || 0,
                     issue_severity: issueSeverity,
