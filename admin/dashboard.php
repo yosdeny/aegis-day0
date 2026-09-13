@@ -188,6 +188,7 @@ function aegis_day0_dashboard_page() {
                                 <?php if (!$is_fp && !empty($plugin_file)) : ?>
                                     <button class="button button-small mark-fp" 
                                             data-plugin="<?php echo esc_attr($plugin_file); ?>"
+                                            data-file-path="<?php echo esc_attr($file_path); ?>"
                                             data-type="<?php echo esc_attr($alert['type']); ?>"
                                             data-function="<?php echo esc_attr(isset($alert['function']) ? $alert['function'] : ''); ?>"
                                             data-line="<?php echo esc_attr(isset($alert['line']) ? $alert['line'] : 0); ?>"
@@ -232,7 +233,7 @@ function aegis_day0_dashboard_page() {
             
             var $btn = $(this);
             var pluginFile = $btn.attr('data-plugin');
-            // Ya no se usa data-file porque puede haber múltiples archivos
+            var filePath = $btn.attr('data-file-path') || '';
             var issueType = $btn.attr('data-type') || 'generic';
             var issueFunction = $btn.attr('data-function') || '';
             var issueLine = $btn.attr('data-line') || 0;
@@ -246,7 +247,7 @@ function aegis_day0_dashboard_page() {
             
             currentAlert = {
                 plugin_file: pluginFile,
-                file_path: null, // Se establecerá null porque ya no viene del botón
+                file_path: filePath,
                 issue_type: issueType,
                 issue_function: issueFunction,
                 issue_line: issueLine,
@@ -264,7 +265,7 @@ function aegis_day0_dashboard_page() {
             // Si no hay file_path, es porque puede haber múltiples archivos o aún no se ha determinado
             // Esto es normal y permitimos continuar solo con el plugin_file
             if (!currentAlert.file_path) {
-                console.log('⚠️ Nota: No hay file_path específico, se marcará todo el plugin como FP');
+                console.log('⚠️ Nota: No hay file_path específico, se usará comodín para todo el plugin');
             }
             
             $('#aegis-fp-info').text(
