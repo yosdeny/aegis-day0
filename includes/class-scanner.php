@@ -36,7 +36,62 @@ class Aegis_Day0_Scanner {
             }
         }
         
+        // Guardar las alertas en la base de datos para que el dashboard las muestre
+        $this->save_alerts($all_results);
+        
+        // Actualizar el timestamp del último escaneo
+        set_transient('aegis_day0_last_scan', current_time('timestamp'), DAY_IN_SECONDS);
+        
         return $all_results;
+    }
+    
+    /**
+     * Save alerts to database
+     */
+    private function save_alerts($all_results) {
+        $alerts = array();
+        
+        foreach ($all_results as $plugin_file => $plugin_info) {
+            $plugin_data = $plugin_info['data'];
+            $issues = $plugin_info['issues'];
+            
+            foreach (array('critical', 'high', 'medium', 'low', 'info') as $severity) {
+                if (!empty($issues[$severity])) {
+                    foreach ($issues[$severity] as $issue) {
+                        $alerts[] = array(
+                            'plugin' => $plugin_file,
+                            'plugin_name' => $plugin_data['Name'],
+                            'file_path' => isset($issue['file_path']) ? $issue['file_path'] : '',
+                            'type' => isset($issue['type']) ? $issue['type'] : 'Unknown',
+                            'severity' => $severity,
+                            'message' => isset($issue['message']) ? $issue['message'] : '',
+                            'line' => isset($issue['line']) ? $issue['line'] : 0,
+                            'code_snippet' => isset($issue['code_snippet']) ? $issue['code_snippet'] : '',
+                            'source' => isset($issue['type']) ? $issue['type'] : 'Scanner',
+                            'false_positive_risk' => $this->get_fp_risk($severity),
+                            'is_false_positive' => false,
+                            'issue_hash' => isset($issue['issue_hash']) ? $issue['issue_hash'] : ''
+                        );
+                    }
+                }
+            }
+        }
+        
+        update_option('aegis_day0_alerts', $alerts);
+    }
+    
+    /**
+     * Get false positive risk level based on severity
+     */
+    private function get_fp_risk($severity) {
+        $risk_map = array(
+            'critical' => 'Bajo',
+            'high' => 'Medio',
+            'medium' => 'Medio',
+            'low' => 'Alto',
+            'info' => 'Alto'
+        );
+        return isset($risk_map[strtolower($severity)]) ? $risk_map[strtolower($severity)] : 'Desconocido';
     }
 
     /**
