@@ -202,8 +202,7 @@ class Aegis_False_Positive_Manager {
             );
             $results = $wpdb->get_results($prepared_query, ARRAY_A);
         } else {
-            $prepared_query = GRM_Query_Validator::safe_prepare(
-                $wpdb,
+            $prepared_query = $wpdb->prepare(
                 "SELECT issue_hash, issue_type, marked_at, notes 
                  FROM $table_name 
                  WHERE plugin_file = %s AND file_path = %s
