@@ -290,7 +290,7 @@ class Aegis_Day0_Scanner {
         $plugin_dir = WP_PLUGIN_DIR . '/' . dirname($plugin_file);
         
         // Directorios a excluir (evitar cargar librerías de terceros)
-        $exclude_dirs = array('vendor', 'node_modules', '.git', 'tests', 'test', 'docs', 'assets', 'languages');
+        $exclude_dirs = array('vendor', 'node_modules', '.git', 'tests', 'test', 'docs', 'languages', 'bin', 'build');
         
         if (is_dir($plugin_dir)) {
             try {
@@ -323,16 +323,8 @@ class Aegis_Day0_Scanner {
                             continue;
                         }
                         
-                        // Excluir archivos muy grandes (> 100KB)
-                        if ($file->getSize() > 100000) {
-                            continue;
-                        }
-                        
-                        // Excluir plugins conocidos de gran tamaño
-                        if (strpos($relative_path, 'woocommerce/') !== false || 
-                            strpos($relative_path, 'elementor/') !== false ||
-                            strpos($relative_path, 'jetpack/') !== false ||
-                            strpos($relative_path, 'wpbakery/') !== false) {
+                        // Excluir archivos muy grandes (>500KB) para evitar problemas de memoria
+                        if ($file->getSize() > 500000) {
                             continue;
                         }
                         
