@@ -76,7 +76,7 @@ function aegis_day0_handle_force_scan() {
         if (current_user_can('manage_options')) {
             delete_transient('aegis_day0_last_scan');
             $scanner = new Aegis_Day0_Scanner();
-            $scanner->run_all_checks();
+            $scanner->run_checks();
             echo '<div class="notice notice-success is-dismissible"><p>Escaneo forzado completado con exito.</p></div>';
         }
     }
@@ -96,7 +96,7 @@ function aegis_day0_handle_clean_scan() {
             
             // Ejecutar nuevo escaneo limpio
             $scanner = new Aegis_Day0_Scanner();
-            $scanner->run_all_checks();
+            $scanner->run_checks();
             
             echo '<div class="notice notice-success is-dismissible"><p>🧹 Escaneo limpio completado. Se eliminaron los falsos positivos anteriores.</p></div>';
         }
@@ -121,7 +121,7 @@ function aegis_day0_dashboard_page() {
     }
     
     // Aplicar filtro de falsos positivos por cada plugin
-    if (class_exists('Aegis_Day0_False_Positive_Manager')) {
+    if (class_exists('Aegis_False_Positive_Manager')) {
         $filtered_alerts = [];
         foreach ($alerts_by_plugin as $plugin_file => $plugin_alerts) {
             $filtered = apply_filters('aegis_day0_filter_alerts', $plugin_alerts, $plugin_file);
@@ -177,10 +177,9 @@ function aegis_day0_dashboard_page() {
                             // Soporte para diferentes nombres de claves para el archivo
                             $file_path = isset($alert['file']) ? $alert['file'] : (isset($alert['file_path']) ? $alert['file_path'] : '');
                             $plugin_file = isset($alert['plugin']) ? $alert['plugin'] : (isset($alert['plugin_file']) ? $alert['plugin_file'] : '');
-                            $plugin_name = isset($alert['plugin_name']) ? $alert['plugin_name'] : $plugin_file;
                         ?>
                         <tr<?php echo $is_fp ? ' style="background-color: #f0f0f1; opacity: 0.7;"' : ''; ?>>
-                            <td><strong><?php echo esc_html($plugin_name); ?></strong></td>
+                            <td><strong><?php echo esc_html($plugin_file); ?></strong></td>
                             <td><?php echo esc_html($alert['type']); ?></td>
                             <td><span style="color: <?php echo $severity_color; ?>; font-weight: bold;"><?php echo esc_html($alert['severity']); ?></span></td>
                             <td><?php echo esc_html($alert['source']); ?></td>

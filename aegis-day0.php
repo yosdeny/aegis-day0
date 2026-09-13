@@ -3,7 +3,7 @@
  * Plugin Name: Aegis Day0
  * Plugin URI: https://github.com/yosdeny
  * Description: Detección proactiva de vulnerabilidades día 0 en plugins de WordPress.
- * Version: 1.0
+ * Version: 0.4
  * Author: YGB
  * Author URI: https://github.com/yosdeny
  * Text Domain: aegis-day0
@@ -18,7 +18,7 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 // Constants
-define('AEGIS_DAY0_VERSION', '1.0');
+define('AEGIS_DAY0_VERSION', '0.2');
 define('AEGIS_DAY0_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('AEGIS_DAY0_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -52,7 +52,7 @@ function aegis_day0_init() {
     Aegis_Day0_Notify::init_batch_notifications();
     
     $scanner = new Aegis_Day0_Scanner();
-    $scanner->run_all_checks();
+    $scanner->run_checks();
 }
 
 // Programar escaneo periódico en lugar de ejecutar en cada carga admin
@@ -208,8 +208,8 @@ function aegis_day0_activate() {
     add_option('aegis_day0_notified_alerts', []);
     
     // Crear tabla de falsos positivos
-    if (class_exists('Aegis_Day0_False_Positive_Manager')) {
-        Aegis_Day0_False_Positive_Manager::maybe_create_table();
+    if (class_exists('Aegis_False_Positive_Manager')) {
+        Aegis_False_Positive_Manager::maybe_create_table();
     }
     
     // Schedule initial report
