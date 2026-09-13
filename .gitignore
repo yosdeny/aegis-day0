@@ -1,1 +1,47 @@
-Nothing needs to be added to .gitignore since only a PHP source file was modified and no build artifacts, dependencies, or temporary files were detected in the changes.
+```php
+<?php
+// Dashboard functionality
+session_start();
+require_once '../config/database.php';
+require_once '../includes/functions.php';
+
+// Check if user is logged in
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
+    header('Location: login.php');
+    exit;
+}
+
+// Fetch dashboard statistics
+$users_count = get_users_count();
+$posts_count = get_posts_count();
+$comments_count = get_comments_count();
+
+include '../templates/header.php';
+?>
+
+<div class="dashboard">
+    <h1>Admin Dashboard</h1>
+    
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3>Total Users</h3>
+            <p><?php echo $users_count; ?></p>
+        </div>
+        <div class="stat-card">
+            <h3>Total Posts</h3>
+            <p><?php echo $posts_count; ?></p>
+        </div>
+        <div class="stat-card">
+            <h3>Total Comments</h3>
+            <p><?php echo $comments_count; ?></p>
+        </div>
+    </div>
+
+    <div class="recent-activity">
+        <h2>Recent Activity</h2>
+        <!-- Recent activity content -->
+    </div>
+</div>
+
+<?php include '../templates/footer.php'; ?>
+```

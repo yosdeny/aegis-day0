@@ -217,6 +217,12 @@ function aegis_day0_dashboard_page() {
             e.preventDefault();
             
             var $btn = $(this);
+            
+            // 1. Verificar si ya está marcado (estado 0 o 1)
+            if ($btn.data('is-fp') == '1') {
+                return; // Ya es FP, no hacer nada
+            }
+            
             var pluginFile = $btn.attr('data-plugin');
             var filePath = $btn.attr('data-file-path') || '';
             var issueType = $btn.attr('data-type') || 'generic';
@@ -232,7 +238,7 @@ function aegis_day0_dashboard_page() {
                 return;
             }
             
-            // Mostrar estado de carga en el botón
+            // Mostrar estado de carga
             var originalText = $btn.text();
             $btn.prop('disabled', true).text('⏳ Guardando...');
             
@@ -255,7 +261,9 @@ function aegis_day0_dashboard_page() {
                     console.log('✅ Respuesta servidor:', response);
                     
                     if (response && response.success) {
-                        // Éxito real: Reemplazar TODA la celda con mensaje confirmado
+                        // ÉXITO: Marcar estado internamente y cambiar UI
+                        $btn.data('is-fp', '1');
+                        
                         var $td = $btn.closest('td');
                         var $tr = $btn.closest('tr');
                         
@@ -270,7 +278,7 @@ function aegis_day0_dashboard_page() {
                         
                         console.log('✅ UI actualizada correctamente');
                     } else {
-                        // Error lógico del servidor: restaurar botón
+                        // ERROR: Restaurar botón
                         var errorMsg = response && response.data && response.data.message ? response.data.message : 'Error desconocido';
                         console.error('❌ Error servidor:', errorMsg);
                         $btn.prop('disabled', false).text('🚫 Marcar como FP');
