@@ -125,7 +125,7 @@ class Aegis_False_Positive_Manager {
             [
                 'plugin_file' => sanitize_text_field($plugin_file),
                 'file_path' => sanitize_text_field($file_path),
-                'issue_type' => sanitize_text_field($issue['type']),
+                'issue_type' => substr(sanitize_text_field($issue['type']), 0, 95),
                 'issue_hash' => $issue_hash,
                 'marked_by' => $user_id,
                 'notes' => sanitize_textarea_field($notes)
@@ -136,9 +136,12 @@ class Aegis_False_Positive_Manager {
         if ($result === false) {
             // Debug: registrar el error real de WordPress
             error_log('Aegis Day0 FP Error: ' . $wpdb->last_error);
-            error_log('Aegis Day0 FP Data: plugin_file=' . $plugin_file . ', file_path=' . $file_path . ', issue_type=' . $issue['type']);
+            error_log('Aegis Day0 FP Data: plugin_file=' . $plugin_file . ', file_path=' . $file_path . ', issue_type=' . $issue['type'] . ', hash=' . $issue_hash);
             return new WP_Error('db_error', __('Error al guardar el falso positivo.', 'aegis-day0') . ' ' . $wpdb->last_error);
         }
+        
+        // Registrar éxito con más detalles
+        error_log('Aegis Day0 FP Inserted: id=' . $wpdb->insert_id . ', plugin=' . $plugin_file . ', file=' . $file_path);
         
         return true;
     }
@@ -440,13 +443,18 @@ class Aegis_False_Positive_Manager {
         $result = self::mark_as_false_positive($plugin_file, $file_path, $issue, $notes);
         
         if (is_wp_error($result)) {
+            error_log('Aegis Day0 FP Mark Error: ' . $result->get_error_message());
             wp_send_json_error(['message' => $result->get_error_message()]);
             return;
         }
         
         // Guardar snapshot actualizado después de marcar FP
-        self::save_fp_snapshot($plugin_file);
+        $snapshot_result = self::save_fp_snapshot($plugin_file);
+        if (!$snapshot_result) {
+            error_log('Aegis Day0 FP Snapshot Warning: Failed to save snapshot for ' . $plugin_file);
+        }
         
+        error_log('Aegis Day0 FP Success: plugin=' . $plugin_file . ', file=' . $file_path . ', type=' . $issue_type);
         wp_send_json_success(['message' => __('Reporte marcado como falso positivo', 'aegis-day0')]);
     }
     
