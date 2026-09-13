@@ -288,12 +288,17 @@ function aegis_day0_dashboard_page() {
         $('#aegis-fp-confirm').click(function() {
             if (!currentAlert) return;
             
+            var $confirmBtn = $(this);
+            var originalText = $confirmBtn.text();
             var notes = $('#aegis-fp-notes').val();
             
             // Asegurar que issue_type tenga un valor por defecto si está vacío
             if (!currentAlert.issue_type || currentAlert.issue_type === '') {
                 currentAlert.issue_type = 'generic';
             }
+            
+            // Mostrar estado de carga
+            $confirmBtn.prop('disabled', true).text('⏳ Guardando...');
             
             console.log('=== ENVIANDO AJAX ===');
             console.log('Datos:', currentAlert);
@@ -320,11 +325,15 @@ function aegis_day0_dashboard_page() {
                     
                     if (response.success) {
                         alert('✅ ' + response.data.message);
+                        $('#aegis-fp-modal').fadeOut();
+                        $('#aegis-fp-notes').val('');
+                        currentAlert = null;
                         location.reload();
                     } else {
                         var errorMsg = response.data?.message || 'Error desconocido';
                         console.error('❌ Error del servidor:', errorMsg);
                         alert('❌ Error: ' + errorMsg);
+                        $confirmBtn.prop('disabled', false).text(originalText);
                     }
                 },
                 error: function(xhr, status, error) {
@@ -333,12 +342,9 @@ function aegis_day0_dashboard_page() {
                     console.error('Error:', error);
                     console.error('XHR Response:', xhr.responseText);
                     alert('❌ Error de conexión: ' + status + '\n\nRevisa la consola para más detalles.');
+                    $confirmBtn.prop('disabled', false).text(originalText);
                 }
             });
-            
-            $('#aegis-fp-modal').fadeOut();
-            $('#aegis-fp-notes').val('');
-            currentAlert = null;
         });
         
         // Cerrar modal al hacer click fuera
