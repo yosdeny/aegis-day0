@@ -53,6 +53,13 @@ class Aegis_Day0_Scanner {
         }
         set_transient('aegis_day0_last_scan', time(), HOUR_IN_SECONDS);
         
+        // Iniciar el monitor de wpdb::prepare ANTES de cargar los plugins
+        // Esto permite capturar errores en tiempo de ejecución durante el escaneo
+        if (class_exists('Aegis_WPDB_Monitor')) {
+            Aegis_WPDB_Monitor::clear_issues();
+            Aegis_WPDB_Monitor::start_monitoring();
+        }
+        
         $plugins = get_plugins();
         $alerts = [];
         $processed_alerts = []; // Track unique alerts to prevent duplicates within same scan
@@ -67,6 +74,14 @@ class Aegis_Day0_Scanner {
             $fp_manager_path = __DIR__ . '/class-false-positive-manager.php';
             if (file_exists($fp_manager_path)) {
                 require_once $fp_manager_path;
+            }
+        }
+        
+        // Cargar el monitor de wpdb::prepare si no está cargado
+        if (!class_exists('Aegis_WPDB_Monitor')) {
+            $monitor_path = __DIR__ . '/class-wpdb-monitor.php';
+            if (file_exists($monitor_path)) {
+                require_once $monitor_path;
             }
         }
         
@@ -456,6 +471,68 @@ class Aegis_Day0_Scanner {
             }
         }
 
+        // Recopilar problemas detectados por el monitor de wpdb::prepare en tiempo de ejecución
+        if (class_exists('Aegis_WPDB_Monitor')) {
+            $runtime_issues = Aegis_WPDB_Monitor::get_detected_issues();
+            foreach ($runtime_issues as $issue) {
+                // Determinar el plugin_file desde la ruta del archivo
+                $detected_plugin_file = self::get_plugin_file_from_path($issue['file']);
+                
+                if ($detected_plugin_file && $detected_plugin_file !== $self_plugin_file) {
+                    $alert_key = md5($detected_plugin_file . '|' . $issue['type'] . '|' . $issue['hash']);
+                    
+                    if (!isset($processed_alerts[$alert_key])) {
+                        $processed_alerts[$alert_key] = true;
+                        
+                        // Verificar si es un falso positivo conocido
+                        $is_fp = false;
+                        if (class_exists('Aegis_False_Positive_Manager')) {
+                            $fp_issue = [
+                                'type' => $issue['type'],
+                                'severity' => $issue['severity'],
+                                'source' => 'Runtime Monitor',
+                                'function' => $issue['function'] ?? '',
+                                'line' => $issue['line'] ?? 0
+                            ];
+                            $is_fp = Aegis_False_Positive_Manager::is_false_positive(
+                                $detected_plugin_file, 
+                                $issue['file'], 
+                                $fp_issue
+                            );
+                        }
+                        
+                        $alerts[] = [
+                            'plugin'            => $detected_plugin_file,
+                            'plugin_file'       => $detected_plugin_file,
+                            'file_path'         => $issue['file'],
+                            'type'              => sanitize_text_field($issue['type']),
+                            'severity'          => $issue['severity'],
+                            'source'            => 'Runtime Monitor',
+                            'false_positive_risk' => 'low',
+                            'function'          => $issue['function'] ?? 'unknown',
+                            'line'              => $issue['line'] ?? 0,
+                            'description'       => $issue['description'],
+                            'details'           => $issue['details'] ?? [],
+                            'is_false_positive' => $is_fp
+                        ];
+                        
+                        $currently_detected[$alert_key] = true;
+                        
+                        Aegis_Day0_Logger::add_log(
+                            $detected_plugin_file,
+                            $issue['type'],
+                            $issue['severity'],
+                            'Runtime Monitor',
+                            sprintf('Línea %d en %s: %s', $issue['line'], basename($issue['file']), $issue['description'])
+                        );
+                        
+                        // No enviar email para warnings de baja severidad, solo mostrar en panel
+                        // El sistema de FPs ya manejó si debe enviarse o no
+                    }
+                }
+            }
+        }
+
         // Guardar alertas actuales
         update_option('aegis_day0_alerts', $alerts);
         
@@ -645,6 +722,42 @@ class Aegis_Day0_Scanner {
         }
 
         return $files;
+    }
+
+    /**
+     * Obtiene el plugin_file (relative path) desde una ruta absoluta de archivo
+     * 
+     * @param string $file_path Ruta absoluta del archivo
+     * @return string|false El plugin_file o false si no pertenece a un plugin
+     */
+    private static function get_plugin_file_from_path($file_path) {
+        if (!function_exists('get_plugins')) {
+            require_once ABSPATH . 'wp-admin/includes/plugin.php';
+        }
+        
+        $all_plugins = get_plugins();
+        
+        foreach ($all_plugins as $plugin_file => $plugin_data) {
+            $plugin_dir = WP_PLUGIN_DIR . '/' . dirname($plugin_file);
+            
+            if (strpos($file_path, $plugin_dir) === 0) {
+                return $plugin_file;
+            }
+        }
+        
+        // También verificar en mu-plugins
+        if (defined('WPMU_PLUGIN_DIR')) {
+            $mu_plugins = get_mu_plugins();
+            foreach ($mu_plugins as $plugin_file => $plugin_data) {
+                $plugin_dir = WPMU_PLUGIN_DIR . '/' . dirname($plugin_file);
+                
+                if (strpos($file_path, $plugin_dir) === 0) {
+                    return $plugin_file;
+                }
+            }
+        }
+        
+        return false;
     }
 
     /**
