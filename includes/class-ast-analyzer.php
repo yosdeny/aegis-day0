@@ -262,6 +262,18 @@ class Aegis_AST_Analyzer {
     }
 
     /**
+     * Obtener contenido del archivo actual
+     * 
+     * @return string Contenido del archivo
+     */
+    public function get_current_content() {
+        if (empty($this->file_content)) {
+            return '';
+        }
+        return $this->file_content;
+    }
+
+    /**
      * Analiza un archivo PHP usando AST
      *
      * @param string $file_path Ruta del archivo a analizar
