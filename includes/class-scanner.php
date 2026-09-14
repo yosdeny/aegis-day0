@@ -391,7 +391,10 @@ class Aegis_Day0_Scanner {
                             'false_positive_risk' => 'low',
                             'function'    => isset($issue['function']) ? $issue['function'] : 'wpdb::prepare',
                             'line'        => isset($issue['line']) ? $issue['line'] : 0,
-                            'description' => isset($issue['message']) ? $issue['message'] : ''
+                            'description' => isset($issue['message']) ? $issue['message'] : '',
+                            'markers_found' => isset($issue['markers_found']) ? $issue['markers_found'] : 0,
+                            'arguments_passed' => isset($issue['arguments_passed']) ? $issue['arguments_passed'] : 0,
+                            'sql_preview' => isset($issue['sql_preview']) ? $issue['sql_preview'] : ''
                         ];
 
                         // Track this detection
