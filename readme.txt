@@ -5,7 +5,7 @@ Requires at least: 7.0
 Tested up to: 7.1
 Requires PHP: 8.0
 Tested PHP: 8.2
-Stable tag: 0.4
+Stable tag: 1.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -50,6 +50,20 @@ Los resultados del análisis estático deben ser verificados manualmente. El plu
 
 == Changelog ==
 
+= 1.2.0 =
+* **MEJORA CRÍTICA**: Visualización de fragmentos de código (code snippets) para TODOS los tipos de errores detectados.
+  - Ahora muestra 2 líneas de contexto antes y después del error.
+  - Resalta la línea exacta del problema con fondo rojo y flecha indicadora.
+  - Funciona para: SQL Injection, XSS, File Inclusion, Eval usage, AJAX insecurity, y más.
+* **MEJORA**: Reporte detallado de errores en $wpdb->prepare().
+  - Muestra ruta relativa exacta del archivo dentro del plugin/tema.
+  - Indica número de línea específico del error.
+  - Cuenta marcadores (%s, %d, %f) encontrados vs argumentos pasados.
+  - Vista previa truncada de la consulta SQL problemática.
+* **MEJORA**: Optimización del escáner recursivo para plugins con cientos de archivos.
+* **FIX**: Corrección de errores fatales en el analizador AST (clase Aegis_AST_Visitor).
+* **FIX**: Restauración de botones "Marcar como FP" (Falso Positivo) en el dashboard.
+
 = 0.4 =
 * Nueva funcionalidad en el dashboard: botón "Limpiar Alertas y Re-escanear" que elimina todos los resultados almacenados previamente y ejecuta un escaneo completamente limpio desde cero.
 * Interfaz visual para gestionar falsos positivos: ahora puedes limpiar manualmente el historial de alertas y forzar un re-escaneo con las reglas actualizadas directamente desde el dashboard.
@@ -77,6 +91,9 @@ Los resultados del análisis estático deben ser verificados manualmente. El plu
 * Sistema de logs y exportación.
 
 == Upgrade Notice ==
+
+= 1.2.0 =
+Actualización crítica que mejora drásticamente la usabilidad del escáner. Ahora podrás identificar y corregir vulnerabilidades mucho más rápido gracias a la visualización de fragmentos de código para todos los tipos de errores. Se incluye también reporte detallado para errores de $wpdb->prepare() con conteo de marcadores y vista previa SQL. Recomendado instalar inmediatamente.
 
 = 0.4 =
 Nueva función para limpiar falsos positivos: botón en el dashboard para eliminar alertas almacenadas y re-escanear desde cero. Mejoras en detección de inclusiones dinámicas seguras.
