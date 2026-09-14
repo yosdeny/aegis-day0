@@ -129,7 +129,8 @@ class Aegis_Day0_Scanner {
                             'severity'    => sanitize_text_field($issue['severity']),
                             'source'      => 'Static Scan',
                             'false_positive_risk' => isset($issue['false_positive_risk']) ? $issue['false_positive_risk'] : 'unknown',
-                            'is_false_positive' => true
+                            'is_false_positive' => true,
+                            'code_snippet' => isset($issue['code_snippet']) ? $issue['code_snippet'] : []
                         ];
                         continue; // Saltar notificación y auto-disable
                     }
@@ -141,7 +142,8 @@ class Aegis_Day0_Scanner {
                         'type'        => sanitize_text_field($issue['type']),
                         'severity'    => sanitize_text_field($issue['severity']),
                         'source'      => 'Static Scan',
-                        'false_positive_risk' => isset($issue['false_positive_risk']) ? $issue['false_positive_risk'] : 'unknown'
+                        'false_positive_risk' => isset($issue['false_positive_risk']) ? $issue['false_positive_risk'] : 'unknown',
+                        'code_snippet' => isset($issue['code_snippet']) ? $issue['code_snippet'] : []
                     ];
                     
                     // Track this detection
@@ -209,7 +211,8 @@ class Aegis_Day0_Scanner {
                                 'false_positive_risk' => isset($issue['false_positive_risk']) ? $issue['false_positive_risk'] : 'unknown',
                                 'function'    => isset($issue['function']) ? $issue['function'] : '',
                                 'line'        => isset($issue['line']) ? $issue['line'] : 0,
-                                'is_false_positive' => true
+                                'is_false_positive' => true,
+                                'code_snippet' => isset($issue['code_snippet']) ? $issue['code_snippet'] : []
                             ];
                             continue; // Saltar notificación y auto-disable
                         }
@@ -223,7 +226,8 @@ class Aegis_Day0_Scanner {
                             'source'      => 'Token Analysis',
                             'false_positive_risk' => isset($issue['false_positive_risk']) ? $issue['false_positive_risk'] : 'unknown',
                             'function'    => isset($issue['function']) ? $issue['function'] : '',
-                            'line'        => isset($issue['line']) ? $issue['line'] : 0
+                            'line'        => isset($issue['line']) ? $issue['line'] : 0,
+                            'code_snippet' => isset($issue['code_snippet']) ? $issue['code_snippet'] : []
                         ];
                         
                         // Track this detection
@@ -292,7 +296,8 @@ class Aegis_Day0_Scanner {
                                 'false_positive_risk' => isset($issue['false_positive_risk']) ? $issue['false_positive_risk'] : 'unknown',
                                 'function'    => isset($issue['function']) ? $issue['function'] : '',
                                 'line'        => isset($issue['line']) ? $issue['line'] : 0,
-                                'is_false_positive' => true
+                                'is_false_positive' => true,
+                                'code_snippet' => isset($issue['code_snippet']) ? $issue['code_snippet'] : []
                             ];
                             continue; // Saltar notificación y auto-disable
                         }
@@ -306,7 +311,8 @@ class Aegis_Day0_Scanner {
                             'source'      => 'AST Analysis',
                             'false_positive_risk' => isset($issue['false_positive_risk']) ? $issue['false_positive_risk'] : 'unknown',
                             'function'    => isset($issue['function']) ? $issue['function'] : '',
-                            'line'        => isset($issue['line']) ? $issue['line'] : 0
+                            'line'        => isset($issue['line']) ? $issue['line'] : 0,
+                            'code_snippet' => isset($issue['code_snippet']) ? $issue['code_snippet'] : []
                         ];
 
                         // Track this detection
@@ -704,6 +710,9 @@ class Aegis_Day0_Scanner {
         // Calcular ruta relativa desde WP_PLUGIN_DIR para file_path
         $relative_path = str_replace(WP_PLUGIN_DIR . '/', '', $file_path);
 
+        // Dividir contenido en líneas para generar snippets
+        $lines = explode("\n", $content);
+
         foreach (Aegis_Day0_Rules::get_rules() as $rule) {
             if (@preg_match($rule['pattern'], $content, $matches, PREG_OFFSET_CAPTURE)) {
                 // Apply contextual filtering to reduce false positives
@@ -713,18 +722,52 @@ class Aegis_Day0_Scanner {
                     }
                 }
 
+                $offset = $matches[0][1];
+                $line_number = $this->get_line_number($content, $offset);
+                
+                // Generar code_snippet para el error
+                $code_snippet = $this->generate_code_snippet($lines, $line_number);
+
                 $issues[] = [
                     'type'       => $rule['description'],
                     'severity'   => $rule['severity'],
                     'false_positive_risk' => isset($rule['false_positive_risk']) ? $rule['false_positive_risk'] : 'unknown',
                     'file'       => basename($file_path),
                     'file_path'  => $relative_path, // RUTA RELATIVA COMPLETA (ej: includes/class-something.php)
-                    'line'       => $this->get_line_number($content, $matches[0][1])
+                    'line'       => $line_number,
+                    'code_snippet' => $code_snippet
                 ];
             }
         }
 
         return $issues;
+    }
+
+    /**
+     * Genera un fragmento de código alrededor de una línea específica
+     * 
+     * @param array $lines Array de líneas del archivo
+     * @param int $line_number Número de línea donde ocurre el error
+     * @return array Fragmento de código con contexto
+     */
+    private function generate_code_snippet($lines, $line_number) {
+        $snippet = [];
+        $total_lines = count($lines);
+        
+        // Mostrar 2 líneas antes y 2 después (ajustable)
+        $start = max(0, $line_number - 3); // -3 porque los arrays son 0-indexed y queremos 2 líneas antes
+        $end = min($total_lines - 1, $line_number + 1); // +1 porque queremos 2 líneas después (la línea del error + 2)
+        
+        for ($i = $start; $i <= $end; $i++) {
+            $current_line = $i + 1; // Convertir a número de línea 1-indexed
+            $snippet[] = [
+                'line_number' => $current_line,
+                'code' => $lines[$i],
+                'is_error' => ($current_line === $line_number)
+            ];
+        }
+        
+        return $snippet;
     }
 
     /**

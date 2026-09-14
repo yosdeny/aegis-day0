@@ -962,6 +962,7 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
 
         // Generar alerta
         if ($adjusted_severity !== 'low' || $uses_user_input) {
+            $code_snippet = $this->analyzer->get_code_snippet($this->analyzer->get_current_content(), $line);
             $this->analyzer->add_alert([
                 'type' => $func_info['type'],
                 'function' => $func_str,
@@ -979,7 +980,8 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
                 ),
                 'uses_user_input' => $uses_user_input,
                 'is_sanitized' => $is_sanitized,
-                'recommendation' => $this->analyzer->get_recommendation($func_info['type'], $func_str)
+                'recommendation' => $this->analyzer->get_recommendation($func_info['type'], $func_str),
+                'code_snippet' => $code_snippet
             ]);
         }
     }
@@ -1039,6 +1041,8 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
             // Bajar severidad para rutas dinámicas sin input directo de usuario
             $severity = $uses_user_input ? 'critical' : 'low';
             $fp_risk = $uses_user_input ? 'low' : 'high';
+            
+            $code_snippet = $this->analyzer->get_code_snippet($this->analyzer->get_current_content(), $line);
 
             $this->analyzer->add_alert([
                 'type' => 'file_inclusion',
@@ -1056,7 +1060,8 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
                         : __('Ruta construida dinámicamente pero sin input directo de usuario. Verificar que use constantes seguras.', 'aegis-day0')
                 ),
                 'uses_user_input' => $uses_user_input,
-                'recommendation' => __('Usar rutas absolutas con constantes como __DIR__ o plugin_dir_path().', 'aegis-day0')
+                'recommendation' => __('Usar rutas absolutas con constantes como __DIR__ o plugin_dir_path().', 'aegis-day0'),
+                'code_snippet' => $code_snippet
             ]);
         }
     }
@@ -1335,6 +1340,8 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
                 ? __('USAR $wpdb->prepare() para todas las consultas con variables. NUNCA concatenar $_GET/$_POST directamente.', 'aegis-day0')
                 : __('Asegurar que todas las variables estén sanitizadas antes de usarlas en consultas SQL.', 'aegis-day0');
             
+            $code_snippet = $this->analyzer->get_code_snippet($this->analyzer->get_current_content(), $line);
+            
             $this->analyzer->add_alert([
                 'type' => $method_info['type'],
                 'function' => '$wpdb->' . $method_str,
@@ -1346,7 +1353,8 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
                 'description' => $description,
                 'uses_user_input' => $uses_user_input,
                 'is_sanitized' => $is_sanitized,
-                'recommendation' => $recommendation
+                'recommendation' => $recommendation,
+                'code_snippet' => $code_snippet
             ]);
         }
     }
@@ -1383,6 +1391,7 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
             }
 
             if ($uses_unsanitized_input) {
+                $code_snippet = $this->analyzer->get_code_snippet($this->analyzer->get_current_content(), $line);
                 $this->analyzer->add_alert([
                     'type' => 'potential_xss',
                     'function' => 'echo',
@@ -1392,7 +1401,8 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
                     'severity' => 'High',
                     'false_positive_risk' => 'medium',
                     'description' => __('Output directo de input de usuario sin escaping aparente - Riesgo de XSS.', 'aegis-day0'),
-                    'recommendation' => __('Usar esc_html(), esc_attr(), o esc_url() según el contexto de output.', 'aegis-day0')
+                    'recommendation' => __('Usar esc_html(), esc_attr(), o esc_url() según el contexto de output.', 'aegis-day0'),
+                    'code_snippet' => $code_snippet
                 ]);
             }
         }
@@ -1543,6 +1553,7 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
                 'false_positive_risk' => $false_positive_risk,
                 'description' => $description,
                 'recommendation' => $recommendation,
+                'code_snippet' => $this->analyzer->get_code_snippet($this->analyzer->get_current_content(), $line),
                 'security_context' => [
                     'has_nonce_validation' => $has_nonce_validation,
                     'has_rate_limiting' => $has_rate_limiting,
