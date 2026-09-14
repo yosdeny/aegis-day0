@@ -1,10 +1,11 @@
-=== Aegis Day0 Security Scanner ===
-Contributors: (tu-usuario)
-Tags: security, scanner, vulnerability, wordpress, firewall
-Requires at least: 5.8
-Tested up to: 6.7
-Stable tag: 1.2.0
-Requires PHP: 7.4
+=== Aegis Day0 ===
+Contributors: yosdeny
+Tags: security, vulnerability scanner, wpscan, firewall, malware
+Requires at least: 7.0
+Tested up to: 7.1
+Requires PHP: 8.0
+Tested PHP: 8.2
+Stable tag: 0.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
