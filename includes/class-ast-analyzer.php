@@ -488,7 +488,7 @@ class Aegis_AST_Analyzer {
      * @param int $context Líneas de contexto antes y después
      * @return array Fragmento de código con información de línea
      */
-    private function get_code_snippet($content, $line_number, $context = 2) {
+    public function get_code_snippet($content, $line_number, $context = 2) {
         $snippet = [];
         $lines = explode("\n", $content);
         $total_lines = count($lines);
