@@ -82,7 +82,8 @@ class Aegis_Prepare_Scanner {
                             ),
                             'markers_found' => $marker_count,
                             'arguments_passed' => $arg_count,
-                            'sql_preview' => $this->truncate_sql($sql_part)
+                            'sql_preview' => $this->truncate_sql($sql_part),
+                            'code_snippet' => $this->get_code_snippet($lines, $line_num)
                         ];
                     }
                 }
@@ -177,6 +178,33 @@ class Aegis_Prepare_Scanner {
             return substr($sql, 0, $max_length - 3) . '...';
         }
         return $sql;
+    }
+    
+    /**
+     * Obtener fragmento de código alrededor de la línea del error
+     * 
+     * @param array $lines Todas las líneas del archivo
+     * @param int $line_num Número de línea del error (0-indexed)
+     * @param int $context Líneas de contexto antes y después
+     * @return array Fragmento de código con información de línea
+     */
+    private function get_code_snippet($lines, $line_num, $context = 2) {
+        $snippet = [];
+        $total_lines = count($lines);
+        
+        // Calcular rango de líneas a mostrar
+        $start = max(0, $line_num - $context);
+        $end = min($total_lines - 1, $line_num + $context);
+        
+        for ($i = $start; $i <= $end; $i++) {
+            $snippet[] = [
+                'line_number' => $i + 1,
+                'code' => $lines[$i],
+                'is_error_line' => ($i === $line_num)
+            ];
+        }
+        
+        return $snippet;
     }
     
     /**

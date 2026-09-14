@@ -394,7 +394,8 @@ class Aegis_Day0_Scanner {
                             'description' => isset($issue['message']) ? $issue['message'] : '',
                             'markers_found' => isset($issue['markers_found']) ? $issue['markers_found'] : 0,
                             'arguments_passed' => isset($issue['arguments_passed']) ? $issue['arguments_passed'] : 0,
-                            'sql_preview' => isset($issue['sql_preview']) ? $issue['sql_preview'] : ''
+                            'sql_preview' => isset($issue['sql_preview']) ? $issue['sql_preview'] : '',
+                            'code_snippet' => isset($issue['code_snippet']) ? $issue['code_snippet'] : []
                         ];
 
                         // Track this detection
