@@ -295,7 +295,8 @@ class Aegis_AST_Analyzer {
             }
 
             // Recorrer el AST y buscar patrones peligrosos
-            $this->traverser->addVisitor(new Aegis_AST_Visitor($this));
+            $visitor = new Aegis_AST_Visitor($this, $content);
+            $this->traverser->addVisitor($visitor);
             $this->traverser->traverse($stmts);
 
         } catch (Error $e) {
@@ -480,6 +481,35 @@ class Aegis_AST_Analyzer {
     }
 
     /**
+     * Obtiene fragmento de código alrededor de la línea del error
+     * 
+     * @param string $content Contenido completo del archivo
+     * @param int $line_number Número de línea del error (1-indexed)
+     * @param int $context Líneas de contexto antes y después
+     * @return array Fragmento de código con información de línea
+     */
+    private function get_code_snippet($content, $line_number, $context = 2) {
+        $snippet = [];
+        $lines = explode("\n", $content);
+        $total_lines = count($lines);
+        $index = $line_number - 1; // Convertir a 0-indexed
+        
+        // Calcular rango de líneas a mostrar
+        $start = max(0, $index - $context);
+        $end = min($total_lines - 1, $index + $context);
+        
+        for ($i = $start; $i <= $end; $i++) {
+            $snippet[] = [
+                'line_number' => $i + 1,
+                'code' => $lines[$i],
+                'is_error_line' => ($i === $index)
+            ];
+        }
+        
+        return $snippet;
+    }
+
+    /**
      * Obtiene recomendación basada en el tipo de vulnerabilidad
      *
      * @param string $type Tipo de vulnerabilidad
@@ -614,6 +644,11 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
     /**
      * Contador de funciones de validación de seguridad encontradas en el archivo
      */
+
+    /**
+     * Contenido del archivo actual (para generar snippets)
+     */
+    private $file_content = null;
     private $security_validation_count = [
         'nonce_checks' => 0,
         'rate_limiting' => 0,
@@ -629,8 +664,17 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
      *
      * @param Aegis_AST_Analyzer $analyzer Instancia del analizador
      */
-    public function __construct(Aegis_AST_Analyzer $analyzer) {
+    public function __construct(Aegis_AST_Analyzer $analyzer, $content = null) {
         $this->analyzer = $analyzer;
+        $this->file_content = $content;
+    }
+    public function __construct(Aegis_AST_Analyzer $analyzer, $content = null) {
+        $this->analyzer = $analyzer;
+        $this->file_content = $content;
+    }
+    public function __construct(Aegis_AST_Analyzer $analyzer, $content = null) {
+        $this->analyzer = $analyzer;
+        $this->file_content = $content;
     }
 
     /**
