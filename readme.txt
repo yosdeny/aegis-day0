@@ -50,6 +50,15 @@ Los resultados del análisis estático deben ser verificados manualmente. El plu
 
 == Changelog ==
 
+= 1.2.0 =
+* MEJORA CRÍTICA: Visualización de fragmentos de código para TODOS los errores detectados (SQL Injection, XSS, File Inclusion, Eval usage, AJAX insecurity, etc.). Ahora el dashboard muestra 2 líneas antes y después del error, con la línea problemática resaltada en rojo y una flecha indicadora.
+* MEJORA: Reporte detallado para errores de $wpdb->prepare() mostrando ruta relativa exacta, número de línea, conteo de marcadores (%s, %d, %f) vs argumentos pasados, y vista previa de la consulta SQL.
+* OPTIMIZACIÓN: Escaneo recursivo eficiente para plugins con cientos de archivos sin saturar la memoria.
+* FIX: Corregido error fatal "Cannot redeclare __construct()" en class-ast-analyzer.php.
+* FIX: Corregido error fatal "Call to undefined method get_current_content()" en análisis AST.
+* FIX: Restaurados botones de "Marcar como FP" (Falso Positivo) en el dashboard.
+* UX: Mejora drástica en la usabilidad para identificar y corregir vulnerabilidades sin abrir archivos manualmente.
+
 = 0.4 =
 * Nueva funcionalidad en el dashboard: botón "Limpiar Alertas y Re-escanear" que elimina todos los resultados almacenados previamente y ejecuta un escaneo completamente limpio desde cero.
 * Interfaz visual para gestionar falsos positivos: ahora puedes limpiar manualmente el historial de alertas y forzar un re-escaneo con las reglas actualizadas directamente desde el dashboard.
