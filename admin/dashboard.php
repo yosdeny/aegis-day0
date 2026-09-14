@@ -159,12 +159,13 @@ function aegis_day0_dashboard_page() {
                 <table class="wp-list-table widefat fixed striped">
                     <thead>
                         <tr>
-                            <th style="width: 20%;">Plugin</th>
-                            <th style="width: 30%;">Tipo</th>
+                            <th style="width: 15%;">Plugin</th>
+                            <th style="width: 20%;">Archivo</th>
+                            <th style="width: 8%;">Línea</th>
+                            <th style="width: 20%;">Tipo</th>
                             <th style="width: 10%;">Severidad</th>
-                            <th style="width: 15%;">Fuente</th>
-                            <th style="width: 15%;">Riesgo Falso Positivo</th>
-                            <th style="width: 10%;">Acciones</th>
+                            <th style="width: 10%;">Fuente</th>
+                            <th style="width: 7%;">Riesgo FP</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -177,31 +178,35 @@ function aegis_day0_dashboard_page() {
                             // Soporte para diferentes nombres de claves para el archivo
                             $file_path = isset($alert['file']) ? $alert['file'] : (isset($alert['file_path']) ? $alert['file_path'] : '');
                             $plugin_file = isset($alert['plugin']) ? $alert['plugin'] : (isset($alert['plugin_file']) ? $alert['plugin_file'] : '');
+                            
+                            // Datos específicos para prepare() scanner
+                            $markers_found = isset($alert['markers_found']) ? $alert['markers_found'] : null;
+                            $arguments_passed = isset($alert['arguments_passed']) ? $alert['arguments_passed'] : null;
+                            $sql_preview = isset($alert['sql_preview']) ? $alert['sql_preview'] : '';
+                            $is_prepare_issue = ($alert['source'] === 'Prepare Scan' && !empty($sql_preview));
                         ?>
                         <tr<?php echo $is_fp ? ' style="background-color: #f0f0f1; opacity: 0.7;"' : ''; ?>>
                             <td><strong><?php echo esc_html($plugin_file); ?></strong></td>
-                            <td><?php echo esc_html($alert['type']); ?></td>
+                            <td>
+                                <code><?php echo esc_html($file_path); ?></code>
+                                <?php if ($is_prepare_issue && !empty($sql_preview)) : ?>
+                                    <div style="margin-top: 5px; font-size: 11px; color: #666;">
+                                        <strong>SQL:</strong> <?php echo esc_html($sql_preview); ?>
+                                    </div>
+                                <?php endif; ?>
+                            </td>
+                            <td><?php echo esc_html(isset($alert['line']) ? $alert['line'] : '-'); ?></td>
+                            <td>
+                                <?php echo esc_html($alert['type']); ?>
+                                <?php if ($is_prepare_issue) : ?>
+                                    <div style="margin-top: 3px; font-size: 11px; color: #d63638;">
+                                        ⚠️ <?php echo esc_html($markers_found); ?> marcadores, <?php echo esc_html($arguments_passed); ?> argumentos
+                                    </div>
+                                <?php endif; ?>
+                            </td>
                             <td><span style="color: <?php echo $severity_color; ?>; font-weight: bold;"><?php echo esc_html($alert['severity']); ?></span></td>
                             <td><?php echo esc_html($alert['source']); ?></td>
                             <td><?php echo $icon . ' ' . esc_html($fp_risk); ?></td>
-                            <td>
-                                <?php if (!$is_fp && !empty($plugin_file)) : ?>
-                                    <button class="button button-small mark-fp" 
-                                            data-plugin="<?php echo esc_attr($plugin_file); ?>"
-                                            data-file-path="<?php echo esc_attr($file_path); ?>"
-                                            data-type="<?php echo esc_attr($alert['type']); ?>"
-                                            data-function="<?php echo esc_attr(isset($alert['function']) ? $alert['function'] : ''); ?>"
-                                            data-line="<?php echo esc_attr(isset($alert['line']) ? $alert['line'] : 0); ?>"
-                                            data-severity="<?php echo esc_attr($alert['severity']); ?>"
-                                            data-source="<?php echo esc_attr($alert['source']); ?>">
-                                        🚫 Marcar como FP
-                                    </button>
-                                <?php elseif ($is_fp) : ?>
-                                    <span style="color: #666; font-style: italic;">Marcado como FP</span>
-                                <?php else : ?>
-                                    <span style="color: #999; font-size: 11px;">Sin datos de plugin</span>
-                                <?php endif; ?>
-                            </td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
