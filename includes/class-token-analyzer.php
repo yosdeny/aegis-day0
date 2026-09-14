@@ -201,6 +201,7 @@ class Aegis_Token_Analyzer {
                             $uses_user_input ? __('Usa input de usuario sin validación aparente.', 'aegis-day0') : __('Verificar contexto de uso.', 'aegis-day0')
                         ),
                         'context' => $this->get_code_context($content, $token_line),
+                        'code_snippet' => $this->get_code_snippet($content, $token_line),
                         'recommendation' => $this->get_recommendation($function_name)
                     ];
                 }
@@ -295,6 +296,35 @@ class Aegis_Token_Analyzer {
         }
         
         return $context_line;
+    }
+    
+    /**
+     * Obtiene fragmento de código alrededor de la línea del error
+     * 
+     * @param string $content Contenido completo del archivo
+     * @param int $line_number Número de línea del error (1-indexed)
+     * @param int $context Líneas de contexto antes y después
+     * @return array Fragmento de código con información de línea
+     */
+    private function get_code_snippet($content, $line_number, $context = 2) {
+        $snippet = [];
+        $lines = explode("\n", $content);
+        $total_lines = count($lines);
+        $index = $line_number - 1; // Convertir a 0-indexed
+        
+        // Calcular rango de líneas a mostrar
+        $start = max(0, $index - $context);
+        $end = min($total_lines - 1, $index + $context);
+        
+        for ($i = $start; $i <= $end; $i++) {
+            $snippet[] = [
+                'line_number' => $i + 1,
+                'code' => $lines[$i],
+                'is_error_line' => ($i === $index)
+            ];
+        }
+        
+        return $snippet;
     }
     
     /**
