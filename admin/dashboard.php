@@ -183,6 +183,7 @@ function aegis_day0_dashboard_page() {
                             $markers_found = isset($alert['markers_found']) ? $alert['markers_found'] : null;
                             $arguments_passed = isset($alert['arguments_passed']) ? $alert['arguments_passed'] : null;
                             $sql_preview = isset($alert['sql_preview']) ? $alert['sql_preview'] : '';
+                            $code_snippet = isset($alert['code_snippet']) ? $alert['code_snippet'] : [];
                             $is_prepare_issue = ($alert['source'] === 'Prepare Scan' && !empty($sql_preview));
                         ?>
                         <tr<?php echo $is_fp ? ' style="background-color: #f0f0f1; opacity: 0.7;"' : ''; ?>>
@@ -192,6 +193,22 @@ function aegis_day0_dashboard_page() {
                                 <?php if ($is_prepare_issue && !empty($sql_preview)) : ?>
                                     <div style="margin-top: 5px; font-size: 11px; color: #666;">
                                         <strong>SQL:</strong> <?php echo esc_html($sql_preview); ?>
+                                    </div>
+                                <?php endif; ?>
+                                <?php if ($is_prepare_issue && !empty($code_snippet)) : ?>
+                                    <div style="margin-top: 8px; background: #f8f9fa; border: 1px solid #ddd; padding: 8px; border-radius: 3px; font-family: monospace; font-size: 11px;">
+                                        <?php foreach ($code_snippet as $snippet_line): 
+                                            $line_num = $snippet_line['line_number'];
+                                            $code = esc_html($snippet_line['code']);
+                                            $is_error = $snippet_line['is_error_line'];
+                                            $bg_color = $is_error ? '#ffebee' : 'transparent';
+                                            $indicator = $is_error ? '→' : ' ';
+                                        ?>
+                                        <div style="background: <?php echo $bg_color; ?>; padding: 2px 4px;">
+                                            <span style="color: #999; width: 30px; display: inline-block;"><?php echo $line_num; ?></span>
+                                            <span style="color: <?php echo $is_error ? '#d63638' : '#666'; ?>;"><?php echo $indicator; ?> <?php echo $code; ?></span>
+                                        </div>
+                                        <?php endforeach; ?>
                                     </div>
                                 <?php endif; ?>
                             </td>
