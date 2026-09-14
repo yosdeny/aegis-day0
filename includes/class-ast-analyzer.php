@@ -668,14 +668,6 @@ class Aegis_AST_Visitor extends \PhpParser\NodeVisitorAbstract {
         $this->analyzer = $analyzer;
         $this->file_content = $content;
     }
-    public function __construct(Aegis_AST_Analyzer $analyzer, $content = null) {
-        $this->analyzer = $analyzer;
-        $this->file_content = $content;
-    }
-    public function __construct(Aegis_AST_Analyzer $analyzer, $content = null) {
-        $this->analyzer = $analyzer;
-        $this->file_content = $content;
-    }
 
     /**
      * Se llama antes de recorrer los nodos
