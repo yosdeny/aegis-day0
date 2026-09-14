@@ -166,6 +166,7 @@ function aegis_day0_dashboard_page() {
                             <th style="width: 10%;">Severidad</th>
                             <th style="width: 10%;">Fuente</th>
                             <th style="width: 7%;">Riesgo FP</th>
+                            <th style="width: 10%;">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -190,12 +191,12 @@ function aegis_day0_dashboard_page() {
                             <td><strong><?php echo esc_html($plugin_file); ?></strong></td>
                             <td>
                                 <code><?php echo esc_html($file_path); ?></code>
-                                <?php if ($is_prepare_issue && !empty($sql_preview)) : ?>
+                                <?php if (!empty($sql_preview)) : ?>
                                     <div style="margin-top: 5px; font-size: 11px; color: #666;">
                                         <strong>SQL:</strong> <?php echo esc_html($sql_preview); ?>
                                     </div>
                                 <?php endif; ?>
-                                <?php if ($is_prepare_issue && !empty($code_snippet)) : ?>
+                                <?php if (!empty($code_snippet)) : ?>
                                     <div style="margin-top: 8px; background: #f8f9fa; border: 1px solid #ddd; padding: 8px; border-radius: 3px; font-family: monospace; font-size: 11px;">
                                         <?php foreach ($code_snippet as $snippet_line): 
                                             $line_num = $snippet_line['line_number'];
@@ -224,6 +225,19 @@ function aegis_day0_dashboard_page() {
                             <td><span style="color: <?php echo $severity_color; ?>; font-weight: bold;"><?php echo esc_html($alert['severity']); ?></span></td>
                             <td><?php echo esc_html($alert['source']); ?></td>
                             <td><?php echo $icon . ' ' . esc_html($fp_risk); ?></td>
+                            <td>
+                                <button type="button" class="button mark-fp" 
+                                    data-plugin="<?php echo esc_attr($plugin_file); ?>"
+                                    data-file-path="<?php echo esc_attr($file_path); ?>"
+                                    data-type="<?php echo esc_attr($alert['type']); ?>"
+                                    data-function="<?php echo esc_attr(isset($alert['function']) ? $alert['function'] : ''); ?>"
+                                    data-line="<?php echo esc_attr(isset($alert['line']) ? $alert['line'] : 0); ?>"
+                                    data-severity="<?php echo esc_attr($alert['severity']); ?>"
+                                    data-source="<?php echo esc_attr($alert['source']); ?>"
+                                    data-is-fp="<?php echo $is_fp ? '1' : '0'; ?>">
+                                    <?php echo $is_fp ? '✓ Es FP' : '🚫 Marcar como FP'; ?>
+                                </button>
+                            </td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -296,7 +310,7 @@ function aegis_day0_dashboard_page() {
                         });
                         
                         // Reemplazar contenido de la celda
-                        $td.html('<span style="color: #46b450; font-weight: bold;">✓ Marcado como FP</span>');
+                        $td.html('<span style="color: #46b450; font-weight: bold;">✓ Es FP</span>');
                         
                         console.log('✅ UI actualizada correctamente');
                     } else {
